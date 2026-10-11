@@ -2,14 +2,12 @@
   "name": "main",
   "target": "branch",
   "enforcement": "active",
-  "conditions": [
-    {
-      "ref_name": {
-        "include": ["~DEFAULT_BRANCH"],
-        "exclude": []
-      }
+  "conditions": {
+    "ref_name": {
+      "include": ["~DEFAULT_BRANCH"],
+      "exclude": []
     }
-  ],
+  },
   "rules": [
     {
       "type": "deletion"
@@ -34,14 +32,8 @@
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": true,
         "required_status_checks": [
-          {
-            "context": "CI / Build and test",
-            "integration_id": null
-          },
-          {
-            "context": "Analyze",
-            "integration_id": null
-          }
+          { "context": "CI / Build and test" },
+          { "context": "Analyze" }
         ]
       }
     }
