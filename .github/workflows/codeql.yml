@@ -70,8 +70,14 @@ jobs:
           languages: ${{ matrix.language }}
           queries: security-and-quality
 
+      # `--no-build-cache` is not optional. `setup-gradle` restores the Gradle
+      # build cache, which serves compileDebugKotlin as FROM-CACHE. A cached task
+      # does not run, so the Kotlin compiler never starts, the tracer captures no
+      # call graph, and the analysis dies with "CodeQL could not process any code
+      # written in Java/Kotlin". The build still prints BUILD SUCCESSFUL, which is
+      # what makes this so confusing to diagnose.
       - name: Build
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --no-build-cache --stacktrace
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
