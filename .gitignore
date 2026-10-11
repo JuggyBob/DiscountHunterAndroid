@@ -12,10 +12,10 @@ build/
 output-metadata.json
 baselineProfiles/
 
-# ...except the deliberately committed release APKs under apk/, which exist so
-# people can install the app without a build environment. This negation must come
-# after `*.apk` above, because in .gitignore the last matching rule wins.
-!apk/**/*.apk
+# There is deliberately no exception re-including an APK. Release binaries are
+# attached to a GitHub Release by the Release workflow, never committed: a binary
+# in the repository is served through the raw file path, which a phone browser
+# refuses or saves under the wrong name, and it bloats every clone for no gain.
 
 # ---- Local machine configuration ---------------------------------------------
 local.properties

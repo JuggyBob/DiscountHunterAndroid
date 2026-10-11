@@ -12,7 +12,9 @@ you find a real problem, there is a safe way to report it.
 | 1.0.x (current release) | ✅ |
 | Anything older | ❌ |
 
-You are running the latest build from [`apk/`](apk/). Security fixes land there.
+You are running the latest build from the
+[Releases page](https://github.com/JuggyBob/DiscountHunterAndroid/releases/latest). Security fixes
+land in the next release.
 
 ## What the app does and does not do
 
