@@ -1,8 +1,9 @@
 name: CodeQL
 
-# Static analysis for Kotlin/Java. CodeQL is what catches the classes of bug that
-# a unit test never will: path traversal in the diagnostics exporter, unsafe
-# deserialisation in the JSON parsers, injection into the WebView-ish surfaces.
+# Static analysis for Kotlin/Java. CodeQL is what catches the classes of bug a
+# unit test never will: path traversal in the diagnostics exporter, unsafe
+# deserialisation in the JSON parsers, injection into anything that handles store
+# HTML.
 #
 # Runs weekly and on demand as well as on push, so it has time to surface issues
 # in code that has not changed recently.
@@ -20,12 +21,17 @@ on:
 
 permissions:
   contents: read
+  # Required to upload the analysis results. Without it the action logs
+  # "does not have permission to access the CodeQL Action API endpoints" and
+  # the run reports failure even when the analysis itself succeeded.
+  security-events: write
+  actions: read
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-      # Let a newer CodeQL ship rather than failing the run against a stale one.
+    # Let a newer CodeQL ship rather than failing the run against a stale one.
     timeout-minutes: 60
 
     strategy:
@@ -43,6 +49,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The build comes BEFORE the analysis, and the order matters.
+      #
+      # CodeQL extracts source through the compiler's call graph, so it has to
+      # watch a real compile happen. Running `analyze` first — which is what this
+      # file originally did — fails with "CodeQL detected code written in
+      # Java/Kotlin but could not process any of it", because there is nothing to
+      # process. The two steps are in this order on purpose.
+      - name: Build
+        run: ./gradlew assembleDebug --stacktrace
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
@@ -53,11 +72,3 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: '/language:${{ matrix.language }}'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      # CodeQL's Kotlin analysis is incomplete, so it is backed by an actual build.
-      # This is what makes the `buildless` mode unnecessary for this project.
-      - name: Build
-        run: ./gradlew assembleDebug --stacktrace
