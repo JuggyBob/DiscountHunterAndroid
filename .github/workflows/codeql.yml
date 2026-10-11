@@ -1,8 +1,9 @@
 name: CodeQL
 
-# Static analysis for Kotlin/Java. CodeQL is what catches the classes of bug that
-# a unit test never will: path traversal in the diagnostics exporter, unsafe
-# deserialisation in the JSON parsers, injection into the WebView-ish surfaces.
+# Static analysis for Kotlin/Java. CodeQL is what catches the classes of bug a
+# unit test never will: path traversal in the diagnostics exporter, unsafe
+# deserialisation in the JSON parsers, injection into anything that handles store
+# HTML.
 #
 # Runs weekly and on demand as well as on push, so it has time to surface issues
 # in code that has not changed recently.
@@ -20,12 +21,17 @@ on:
 
 permissions:
   contents: read
+  # Required to upload the analysis results. Without it the action logs
+  # "does not have permission to access the CodeQL Action API endpoints" and
+  # the run reports failure even when the analysis itself succeeded.
+  security-events: write
+  actions: read
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-      # Let a newer CodeQL ship rather than failing the run against a stale one.
+    # Let a newer CodeQL ship rather than failing the run against a stale one.
     timeout-minutes: 60
 
     strategy:
@@ -33,6 +39,18 @@ jobs:
       matrix:
         language: [ 'java-kotlin' ]
 
+    # The order of the three steps below is load-bearing, and getting it wrong
+    # fails in a way that reads like a CodeQL bug rather than a workflow bug:
+    #
+    #   init    sets LD_PRELOAD and the CODEQL_* variables in the job's
+    #           environment. They only affect steps that run AFTER it.
+    #   Build   therefore has to run after init, so the Gradle/Kotlin compiler
+    #           runs under the tracer and CodeQL sees the call graph.
+    #   analyze reads the database the tracer populated.
+    #
+    # Putting Build first (or analyze before Build) gives
+    # "CodeQL could not process any code written in Java/Kotlin". This workflow
+    # was wrong twice before it was right; the comments stay.
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -43,21 +61,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           queries: security-and-quality
 
+      # `--no-build-cache` is not optional. `setup-gradle` restores the Gradle
+      # build cache, which serves compileDebugKotlin as FROM-CACHE. A cached task
+      # does not run, so the Kotlin compiler never starts, the tracer captures no
+      # call graph, and the analysis dies with "CodeQL could not process any code
+      # written in Java/Kotlin". The build still prints BUILD SUCCESSFUL, which is
+      # what makes this so confusing to diagnose.
+      - name: Build
+        run: ./gradlew assembleDebug --no-build-cache --stacktrace
+
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: '/language:${{ matrix.language }}'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      # CodeQL's Kotlin analysis is incomplete, so it is backed by an actual build.
-      # This is what makes the `buildless` mode unnecessary for this project.
-      - name: Build
-        run: ./gradlew assembleDebug --stacktrace

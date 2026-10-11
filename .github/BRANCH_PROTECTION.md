@@ -9,9 +9,13 @@ an optional ruleset that GitHub *can* apply automatically.
 From a clone of this repository, with `gh` authenticated and admin rights:
 
 ```bash
-gh api -X PUT repos/:owner/:repo/rulesets \
+gh api -X POST repos/:owner/:repo/rulesets \
   --input .github/branch-protection.json
 ```
+
+> **It is `POST`, not `PUT`.** `POST /repos/{owner}/{repo}/rulesets` creates a ruleset; `PUT` only
+> exists on `/rulesets/{id}` and updates an existing one. `PUT` on the collection returns
+> `404 Not Found`, which is a thoroughly unhelpful error to hand someone.
 
 Verify with:
 
@@ -24,6 +28,15 @@ Or do it by hand: **Settings → Rules → Rulesets → New ruleset → Import**
 
 Review the file like any other change — it is the difference between "we require tests" and "we do
 not require tests", and it should get the same scrutiny.
+
+### Two shapes the API rejects
+
+Both were wrong in the first version of this file, and neither is obvious from the docs alone:
+
+- **`conditions` is an object, not an array.** `[{ "ref_name": … }]` fails with
+  *"is not of type `object`"*.
+- **Do not send `"integration_id": null`.** The field is optional and `null` is not an acceptable
+  value for it. Omit the key entirely — GitHub then matches each check by context name.
 
 ---
 
