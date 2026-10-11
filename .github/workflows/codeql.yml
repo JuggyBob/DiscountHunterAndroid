@@ -39,6 +39,18 @@ jobs:
       matrix:
         language: [ 'java-kotlin' ]
 
+    # The order of the three steps below is load-bearing, and getting it wrong
+    # fails in a way that reads like a CodeQL bug rather than a workflow bug:
+    #
+    #   init    sets LD_PRELOAD and the CODEQL_* variables in the job's
+    #           environment. They only affect steps that run AFTER it.
+    #   Build   therefore has to run after init, so the Gradle/Kotlin compiler
+    #           runs under the tracer and CodeQL sees the call graph.
+    #   analyze reads the database the tracer populated.
+    #
+    # Putting Build first (or analyze before Build) gives
+    # "CodeQL could not process any code written in Java/Kotlin". This workflow
+    # was wrong twice before it was right; the comments stay.
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -52,21 +64,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # The build comes BEFORE the analysis, and the order matters.
-      #
-      # CodeQL extracts source through the compiler's call graph, so it has to
-      # watch a real compile happen. Running `analyze` first — which is what this
-      # file originally did — fails with "CodeQL detected code written in
-      # Java/Kotlin but could not process any of it", because there is nothing to
-      # process. The two steps are in this order on purpose.
-      - name: Build
-        run: ./gradlew assembleDebug --stacktrace
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           queries: security-and-quality
+
+      - name: Build
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
