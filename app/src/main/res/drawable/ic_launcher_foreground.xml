@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Launcher foreground: a price tag carrying a "%" glyph.
+    Drawn inside the adaptive-icon safe zone (the central 72x72 of the 108x108 viewport).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Tag body -->
+    <path
+        android:fillColor="#34D399"
+        android:pathData="M56.4,26.6 L82.6,26.6 A5.4,5.4 0 0 1 88,32 L88,55.2 A5.4,5.4 0 0 1 86.7,59 L61.1,84.6 A5.4,5.4 0 0 1 53.5,84.6 L25.4,56.5 A5.4,5.4 0 0 1 25.4,48.9 L47.9,26.4 A5.4,5.4 0 0 1 56.4,26.6 Z" />
+
+    <!-- Tag hole -->
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M72.6,40.4 m-5.6,0 a5.6,5.6 0 1,0 11.2,0 a5.6,5.6 0 1,0 -11.2,0 Z" />
+
+    <!-- Percent: upper dot -->
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M50.4,41.6 m-4.4,0 a4.4,4.4 0 1,0 8.8,0 a4.4,4.4 0 1,0 -8.8,0 Z" />
+
+    <!-- Percent: lower dot -->
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M41.6,66.4 m-4.4,0 a4.4,4.4 0 1,0 8.8,0 a4.4,4.4 0 1,0 -8.8,0 Z" />
+
+    <!-- Percent: slash -->
+    <path
+        android:fillColor="#0B1020"
+        android:pathData="M57.4,39.4 L35.4,68.6 L40.2,71.6 L62.2,42.4 Z" />
+</vector>

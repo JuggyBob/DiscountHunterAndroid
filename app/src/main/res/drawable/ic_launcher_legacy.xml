@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flat launcher icon for API levels below 26, which do not support adaptive icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#10131A"
+        android:pathData="M0,0 h108 v108 h-108 Z" />
+
+    <group android:translateX="0" android:translateY="0" android:scaleX="0.72" android:scaleY="0.72"
+        android:pivotX="54" android:pivotY="54">
+        <path
+            android:fillColor="#34D399"
+            android:pathData="M56.4,26.6 L82.6,26.6 A5.4,5.4 0 0 1 88,32 L88,55.2 A5.4,5.4 0 0 1 86.7,59 L61.1,84.6 A5.4,5.4 0 0 1 53.5,84.6 L25.4,56.5 A5.4,5.4 0 0 1 25.4,48.9 L47.9,26.4 A5.4,5.4 0 0 1 56.4,26.6 Z" />
+        <path
+            android:fillColor="#10131A"
+            android:pathData="M72.6,40.4 m-5.6,0 a5.6,5.6 0 1,0 11.2,0 a5.6,5.6 0 1,0 -11.2,0 Z" />
+        <path
+            android:fillColor="#10131A"
+            android:pathData="M50.4,41.6 m-4.4,0 a4.4,4.4 0 1,0 8.8,0 a4.4,4.4 0 1,0 -8.8,0 Z" />
+        <path
+            android:fillColor="#10131A"
+            android:pathData="M41.6,66.4 m-4.4,0 a4.4,4.4 0 1,0 8.8,0 a4.4,4.4 0 1,0 -8.8,0 Z" />
+        <path
+            android:fillColor="#10131A"
+            android:pathData="M57.4,39.4 L35.4,68.6 L40.2,71.6 L62.2,42.4 Z" />
+    </group>
+</vector>

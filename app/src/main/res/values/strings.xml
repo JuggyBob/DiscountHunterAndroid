@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Discount Hunter</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_deals">Deals</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_wishlist">Wishlist</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Deals -->
+    <string name="deals_title">Today\'s deals</string>
+    <string name="deals_filter_title">Filters &amp; sorting</string>
+    <string name="deals_filter_stores">Stores</string>
+    <string name="deals_filter_discount">Discount</string>
+    <string name="deals_filter_sort">Sort by</string>
+    <string name="deals_filter_search">Filter by title</string>
+    <string name="deals_filter_reset">Reset</string>
+    <string name="deals_filter_apply">Show results</string>
+    <string name="deals_retry">Try again</string>
+    <string name="deals_refresh">Refresh deals</string>
+    <string name="deals_go_today">Today</string>
+    <string name="deals_more">Show more</string>
+
+    <string name="discount_all">All discounts</string>
+    <string name="discount_free">Free only</string>
+    <string name="discount_over_75">75%% and up</string>
+    <string name="discount_over_50">50%% and up</string>
+    <string name="discount_over_25">25%% and up</string>
+
+    <string name="sort_biggest_discount">Biggest discount</string>
+    <string name="sort_lowest_price">Lowest price</string>
+    <string name="sort_title">Title (A–Z)</string>
+
+    <string name="deal_price_free">Free</string>
+    <string name="deal_on_wishlist">On wishlist</string>
+    <string name="deal_upcoming">Upcoming</string>
+    <string name="deal_get_deal">Get deal</string>
+    <string name="deal_details">Details</string>
+    <string name="deal_add_wishlist">Add to wishlist</string>
+    <string name="deal_remove_wishlist">Remove from wishlist</string>
+
+    <!-- Search -->
+    <string name="search_title">Search</string>
+    <string name="search_hint">Search every store</string>
+    <string name="search_clear">Clear search</string>
+
+    <!-- Detail -->
+    <string name="detail_back">Back</string>
+    <string name="detail_offers">Where to buy</string>
+    <string name="intro_tagline">Every discount across Steam, GOG and Epic, in one place</string>
+    <string name="intro_next">Next</string>
+    <string name="intro_previous">Previous</string>
+    <string name="intro_start">Start hunting</string>
+    <string name="intro_1_title">Every deal, one feed</string>
+    <string name="intro_1_body">Steam, GOG and Epic\'s free-games feed are merged into a single list, sorted by the deepest discount. Free games float to the top.</string>
+    <string name="intro_1_caption">Three stores, one list</string>
+    <string name="intro_2_title">Search at once</string>
+    <string name="intro_2_body">One query runs against every store. Results show the cheapest price available and which stores matched, so you never open three tabs to compare.</string>
+    <string name="intro_2_caption">Cheapest price wins</string>
+    <string name="intro_3_title">See it before you buy</string>
+    <string name="intro_3_body">Screenshots and trailers belong to the game you tapped — never to some other title that merely looks similar. Trailers play right on the page.</string>
+    <string name="intro_3_caption">Media that always matches</string>
+    <string name="intro_4_title">Wishlist that watches</string>
+    <string name="intro_4_body">Star anything you are saving up for. When it drops, the wishlist tells you the moment it goes on sale, and from which store.</string>
+    <string name="intro_4_caption">Told the moment it drops</string>
+    <string name="intro_5_title">Price history</string>
+    <string name="intro_5_body">Every price this device has recorded for a game, charted over time — with a link to SteamDB, EGData, GOG Database and the rest for the full history.</string>
+    <string name="intro_5_caption">Know if it is a good deal</string>    <string name="settings_diagnostics">Diagnostics</string>
+    <string name="settings_export_logs_title">Export logs</string>
+    <string name="settings_export_logs_body">Saves the last few hundred app messages plus your device and memory info to a text file you can share, so a bug report can include what happened before it went wrong. No personal data is recorded.</string>
+    <string name="settings_export_logs">Export logs</string>
+    <string name="settings_currency_note">Sets the region prices are requested in. Steam and Epic re-quote in that currency; GOG does not, so its prices keep their own currency and are labelled with it.</string>
+    <string name="settings_delete_data">Delete all app data</string>
+    <string name="settings_delete_data_title">Delete everything</string>
+    <string name="settings_delete_data_body">Wishlist, recent searches, cached pages and saved price history. Your settings go too, and the intro pages come back on the next launch.</string>
+    <string name="settings_delete_data_confirm_title">Delete all app data?</string>
+    <string name="settings_delete_data_confirm_body">This permanently removes your wishlist, recent searches, cached pages, price history and every setting on this device. It cannot be undone.</string>
+    <string name="settings_delete_data_confirm_yes">Delete everything</string>
+    <string name="settings_delete_data_confirm_no">Keep my data</string>    <string name="detail_no_data_title">No details available</string>
+    <string name="detail_no_data_message">None of the stores we track has a page for this game, or they all failed to answer. The price buttons below still open the store.</string>
+    <string name="detail_price_history">Price history</string>
+    <string name="detail_price_history_source">Source</string>
+    <string name="detail_price_history_empty">No price history recorded yet for this game.</string>
+    <string name="detail_price_history_open">Open in browser</string>
+    <string name="detail_screenshots">Screenshots</string>
+    <string name="detail_trailers">Trailers</string>
+    <string name="detail_trailer_expand">Play full screen</string>
+    <string name="detail_trailer_collapse">Back to the page</string>
+    <string name="detail_trailer_close">Close the player</string>
+    <string name="detail_trailer_external">Open the trailer\'s page elsewhere</string>
+    <string name="detail_close">Close</string>
+    <string name="detail_about">About</string>
+    <string name="detail_requirements">System requirements</string>
+    <string name="detail_details_tab">Details</string>
+    <string name="detail_best_price">Best price</string>
+    <string name="detail_open_store_page">Open store page</string>
+    <string name="detail_watch_trailer">Watch</string>
+    <string name="detail_sources">Sources</string>
+    <string name="detail_retry">Retry</string>
+    <string name="detail_screenshot_of">Screenshot %1$d of %2$d</string>
+
+    <!-- Wishlist -->
+    <string name="wishlist_title">Wishlist</string>
+    <string name="wishlist_clear_all">Clear all</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_currency">Currency</string>
+    <string name="settings_stores">Included stores</string>
+    <string name="settings_deals">Deal feed</string>
+    <string name="settings_page_size">Deals to request</string>
+    <string name="settings_cache">Storage</string>
+    <string name="settings_cache_size">Cache size</string>
+    <string name="settings_clear_cache">Clear cache</string>
+    <string name="settings_about">About</string>
+
+    <string name="theme_system">Follow system</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+
+    <string name="cache_cleared">Cache cleared.</string>
+    <string name="cache_calculating">Calculating…</string>
+</resources>

@@ -1,0 +1,109 @@
+name: Bug report
+about: Something in the app does not work, or works incorrectly
+title: "[Bug] "
+labels: bug
+assignees: ''
+# Thanks for filing this.
+#
+# Two things make a bug report dramatically more useful:
+#
+#   1. The steps, exactly as you performed them.
+#   2. A log export. Settings -> Diagnostics -> Export logs writes a file
+#      containing the last few hundred app messages plus your device and memory
+#      info, and hands it to your share sheet. Drag it onto this issue, or paste
+#      it into the last box below. If the app crashed, the crash is captured
+#      before the process dies, so the file has the run-up to the failure.
+#
+# If you are not sure whether something is a bug, that is fine - open the issue
+# anyway and we will work it out.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: A clear, one or two sentence description of the problem.
+      placeholder: The wishlist shows a different price for the same game than its detail page does.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What I expected instead
+      description: What you thought would happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Exact taps, in order. "Tapped the star on the DLC at the bottom of the
+        search results, then switched to the Wishlist tab" is far more useful
+        than "wishlisted a DLC".
+      placeholder: |
+        1. Opened the Search tab
+        2. Searched for "elden ring"
+        3. Scrolled to the bottom
+        4. Tapped the star on "Elden Gunfire 2 Demo"
+        5. Switched to the Wishlist tab
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does this happen?
+      options:
+        - Every time
+        - Sometimes - roughly how often?
+        - Only once, that I have seen
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings - About. Also present in the log export.
+      placeholder: 1.0.0-release
+    validations:
+      required: false
+  - type: input
+    id: android
+    attributes:
+      label: Android version and device
+      description: Also present in the log export.
+      placeholder: Android 14, Pixel 7a
+    validations:
+      required: false
+  - type: dropdown
+    id: currency
+    attributes:
+      label: Currency setting
+      description: >
+        Prices are converted rather than relabelled, and conversion is the most
+        likely place for a pricing bug to live - so this genuinely narrows it down.
+      options:
+        - USD
+        - EUR
+        - GBP
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log export
+      description: >
+        The contents of the file from Settings - Diagnostics - Export logs. Nothing
+        personal is recorded. You can also just attach the file to the issue.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >
+        Network conditions, low storage, anything unusual. Related issue numbers,
+        if you found one while searching. Screenshots can be dragged onto the issue
+        body directly.
+    validations:
+      required: false

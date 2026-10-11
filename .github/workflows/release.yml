@@ -1,0 +1,121 @@
+name: Release
+
+# Builds a release APK and attaches it to a GitHub Release.
+#
+# Trigger it by pushing an annotated tag matching `v*`:
+#
+#     git tag -a v1.1.0 -m "v1.1.0"
+#     git push origin v1.1.0
+#
+# Or run it by hand from the Actions tab.
+#
+# The APK is unsigned unless you add a keystore as a repository secret (see the
+# commented step below). Unsigned release APKs still install — Android asks you to
+# allow installation from your file manager — which is why this repository ships
+# plain APKs rather than going through Google Play.
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and release (e.g. v1.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the tag matches the build version
+        # Catches the most common release mistake: tagging v1.2.0 when the build
+        # still says 1.1.0, so the APK reports a version the tag does not have.
+        run: |
+          DECLARED=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1 | sed 's/-release$//')
+          EXPECTED="${{ steps.version.outputs.name }}"
+          echo "build.gradle.kts says: $DECLARED"
+          echo "tag says:              $EXPECTED"
+          if [ "$DECLARED" != "$EXPECTED" ]; then
+            echo "::error::Tag $EXPECTED does not match versionName $DECLARED in app/build.gradle.kts"
+            exit 1
+          fi
+
+      - name: Run tests before packaging
+        # Never ship a red build, however tempting the tag feels.
+        run: ./gradlew testDebugUnitTest lintDebug --stacktrace
+
+      # To sign releases, add a keystore as a repository secret and uncomment:
+      #
+      # - name: Decode signing key
+      #   run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > release.jks
+      #
+      # - name: Sign release APK
+      #   run: |
+      #     $ANDROID_HOME/build-tools/*/apksigner sign \
+      #       --ks release.jks \
+      #       --ks-pass env:KS_PASS \
+      #       --key-pass env:KEY_PASS \
+      #       --out app-release-signed.apk \
+      #       app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Rename the APK with its version
+        # `1.0.0.apk` in the downloads list beats `app-release.apk`.
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/*.apk "dist/discount-hunter-${{ steps.version.outputs.name }}.apk"
+          ls -la dist/
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Discount Hunter ${{ steps.version.outputs.name }}
+          generate_release_notes: true
+          files: dist/*.apk
+          body: |
+            ## Discount Hunter ${{ steps.version.outputs.name }}
+
+            See [CHANGELOG.md](CHANGELOG.md) for what changed.
+
+            ### Installing
+
+            The APK is unsigned, so Android will ask you to allow installation from your file
+            manager the first time. To sign it yourself, see the commented signing step in
+            `.github/workflows/release.yml`.
+
+            ### Verifying the build
+
+            `ubuntu-latest`, JDK 17, `./gradlew testDebugUnitTest lintDebug assembleRelease`.
+            Every APK here was produced by that exact command.

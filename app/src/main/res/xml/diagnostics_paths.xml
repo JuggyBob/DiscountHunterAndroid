@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Only the exports folder is shared. Exposing the whole cache or files directory through a
+    FileProvider would hand any app that received a URI access to the user's snapshots and saved
+    settings; `AppLog.export` writes a single report into `cache/exports`, so that is all that needs
+    to be reachable.
+-->
+<paths>
+    <cache-path
+        name="diagnostics"
+        path="exports/" />
+</paths>

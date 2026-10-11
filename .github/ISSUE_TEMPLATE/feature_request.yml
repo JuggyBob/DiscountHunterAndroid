@@ -1,0 +1,61 @@
+name: Feature request
+about: Suggest something the app could do
+title: "[Feature] "
+labels: enhancement
+assignees: ''
+# Describe the problem you are trying to solve rather than the solution you have
+# in mind. The solution may well be a good one, but there is often a better
+# approach that only becomes obvious once the underlying problem is clear - and
+# this app has made that call wrong before. See the price-history work in
+# DEV_NOTES.md for a worked example.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that is awkward or impossible today?
+      placeholder: I want to know whether a game I am watching has ever been as cheap as it is now.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What I would like to happen
+      description: >
+        Including how it should behave in the awkward cases - empty results,
+        offline, a game that is on sale at two stores at once, and so on.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives I considered
+      description: >
+        Even briefly. Sometimes someone has already done the thing you were about
+        to suggest, and it is genuinely better.
+    validations:
+      required: false
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the app does not do this today
+      description: If you know, or have a guess. There may be a good reason.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Screenshots, examples, or links
+      description: A store page, a thread, a mock-up - anything concrete.
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Implementation notes
+      description: >
+        Optional. If you can see how this would fit the existing code, that is
+        useful - but an idea with no code behind it is still perfectly welcome.
+        See docs/ARCHITECTURE.md for how things fit together.
+    validations:
+      required: false

@@ -1,0 +1,63 @@
+name: CodeQL
+
+# Static analysis for Kotlin/Java. CodeQL is what catches the classes of bug that
+# a unit test never will: path traversal in the diagnostics exporter, unsafe
+# deserialisation in the JSON parsers, injection into the WebView-ish surfaces.
+#
+# Runs weekly and on demand as well as on push, so it has time to surface issues
+# in code that has not changed recently.
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Mondays at 03:17 UTC. Deliberately not midnight — every scheduled workflow
+    # in the world fires then and GitHub queues them.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+      # Let a newer CodeQL ship rather than failing the run against a stale one.
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'java-kotlin' ]
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # CodeQL's Kotlin analysis is incomplete, so it is backed by an actual build.
+      # This is what makes the `buildless` mode unnecessary for this project.
+      - name: Build
+        run: ./gradlew assembleDebug --stacktrace

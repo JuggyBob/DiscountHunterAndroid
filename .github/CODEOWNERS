@@ -1,0 +1,38 @@
+# Code owners
+
+# Reviewers are requested automatically when a pull request touches these paths.
+# Requires "Require review from Code Owners" to be enabled in branch protection —
+# see BRANCH_PROTECTION.md.
+#
+# Replace the placeholder handle with a real maintainer's GitHub username, and add
+# more handles after a comma where several people share an area. GitHub picks the
+# *last* matching rule, so the specific entries at the bottom deliberately override
+# the broad `*` catch-all above them.
+
+# Default: anything not matched below.
+*                       @JuggyBob
+
+# Build, CI and release plumbing.
+/
+.github/               @JuggyBob
+/build.gradle.kts       @JuggyBob
+/settings.gradle.kts    @JuggyBob
+gradle/                 @JuggyBob
+
+# Store integrations. These are the fragile ones: they parse third-party payloads
+# that change without notice, and the parsers have caused real crashes.
+app/src/main/java/com/discounthunter/android/data/steam/   @JuggyBob
+app/src/main/java/com/discounthunter/android/data/gog/     @JuggyBob
+app/src/main/java/com/discounthunter/android/data/epic/    @JuggyBob
+
+# Core model and pricing. Currency conversion and price ranking live here and have
+# produced several subtle bugs; changes need a careful eye.
+app/src/main/java/com/discounthunter/android/core/         @JuggyBob
+
+# Caching and persistence. Region-scoped snapshots and their invalidation.
+app/src/main/java/com/discounthunter/android/data/cache/  @JuggyBob
+app/src/main/java/com/discounthunter/android/data/repo/   @JuggyBob
+
+# Documentation.
+*.md                    @JuggyBob
+/docs/                  @JuggyBob

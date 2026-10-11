@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup and device-transfer rules (Android 12 and above).
+
+    Settings and the wishlist travel with the user; the snapshots of past days do too, since they are
+    browsable history rather than a disposable cache. Cached payloads and artwork live in cacheDir,
+    which the platform never includes.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="datastore/" />
+        <include domain="file" path="snapshots/" />
+        <include domain="sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="datastore/" />
+        <include domain="file" path="snapshots/" />
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

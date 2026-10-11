@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules (Android 11 and below).
+
+    Settings and the wishlist live in the DataStore file and are worth backing up. Everything else is
+    either re-downloadable or, in the case of cached store pages, already excluded by living in
+    cacheDir - which the platform never backs up - so there is nothing further to exclude here.
+    Including datastore/ alone would also drop the snapshots, which are browsable history.
+-->
+<full-backup-content>
+    <include domain="file" path="datastore/" />
+    <include domain="sharedpref" path="." />
+</full-backup-content>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Density-independent fallback for API 24-25, which cannot read adaptive icons. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_launcher_legacy"
+    android:gravity="fill" />

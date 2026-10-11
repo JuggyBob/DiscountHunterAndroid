@@ -1,0 +1,68 @@
+# ---- Gradle / Android build output -------------------------------------------
+build/
+.gradle/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+output-metadata.json
+baselineProfiles/
+
+# ...except the deliberately committed release APKs under apk/, which exist so
+# people can install the app without a build environment. This negation must come
+# after `*.apk` above, because in .gitignore the last matching rule wins.
+!apk/**/*.apk
+
+# ---- Local machine configuration ---------------------------------------------
+local.properties
+*.keystore
+*.jks
+keystore.properties
+signing.properties
+
+# ---- IDE --------------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.fleet/
+.navigation/
+captures/
+*.hprof
+
+# Android Studio / IntelliJ
+out/
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf/
+
+# ---- Gradle -----------------------------------------------------------------
+!gradle/wrapper/gradle-wrapper.jar
+.gradletasknamecache/
+.kotlin/
+
+# ---- OS noise ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+.directory
+
+# ---- Logs and diagnostics ---------------------------------------------------
+*.log
+logs/
+crashlytics-build.log
+
+# ---- Secrets ----------------------------------------------------------------
+secrets.properties
+.env
+.env.*
+*.p12
+*.pem

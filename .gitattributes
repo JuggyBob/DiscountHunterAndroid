@@ -1,0 +1,52 @@
+# Normalise line endings so a Windows checkout and a Linux CI run do not disagree.
+# Without this, git's default `core.autocrlf` behaviour rewrites every file on
+# checkout and every diff in the project looks changed.
+
+* text=auto eol=lf
+
+# --- Source ------------------------------------------------------------------
+*.kt        text
+*.kts       text
+*.java      text
+*.pro       text
+*.xml       text
+*.toml      text
+*.properties text
+
+# --- Build files that must keep their exact content --------------------------
+gradlew      text eol=lf
+*.bat        text eol=crlf
+
+# --- Documentation -----------------------------------------------------------
+*.md         text
+*.yml        text
+*.yaml       text
+*.json       text
+.gitignore   text
+.gitattributes text
+
+# --- Binary ------------------------------------------------------------------
+# Must never be line-ending converted, or they are corrupted in the repository.
+*.apk        binary
+*.aab        binary
+*.jar        binary
+*.png        binary
+*.jpg        binary
+*.webp       binary
+*.so         binary
+*.dex        binary
+*.dm         binary
+*.keystore   binary
+*.jks        binary
+
+# --- Generated / vendored -----------------------------------------------------
+gradle/wrapper/gradle-wrapper.jar   binary
+app/build/                          export-ignore
+build/                              export-ignore
+apk/release/baselineProfiles/       export-ignore
+*.log                               text binary
+
+# --- Language stats for linguist ---------------------------------------------
+# Generated code that should not skew the language statistics on the repo page.
+docs/**             linguist-documentation
+apk/**              linguist-ignored

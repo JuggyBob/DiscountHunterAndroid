@@ -1,0 +1,45 @@
+name: Configuration
+about: Build settings, dependency bumps, CI, tooling
+title: "[Chore] "
+labels: chore
+assignees: ''
+# For changes that are not user-visible behaviour: build configuration, dependency
+# updates, CI workflows, Gradle or tooling. For a bug that a user would notice,
+# use the Bug report template instead.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What changed
+      description: What you changed, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: >
+        What problem does this solve? For a dependency bump, why the new version
+        - what does it fix or enable?
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: How you verified it
+      description: For a dependency bump, which modules you built and tested.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: The local check suite passes - testDebugUnitTest, lintDebug, assembleDebug
+          required: false
+        - label: The release build works - assembleRelease
+          required: false
+        - label: No user-visible behaviour changed
+          required: true
+        - label: Dependency versions and the Gradle wrapper were updated together, where applicable
+          required: false
