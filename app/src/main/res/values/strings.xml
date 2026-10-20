@@ -123,4 +123,19 @@
 
     <string name="cache_cleared">Cache cleared.</string>
     <string name="cache_calculating">Calculating…</string>
+    <!-- Background sale and free-game announcements. -->
+    <string name="settings_alerts_title">Deal alerts</string>
+    <string name="settings_alerts_summary">Tell me when a saved game goes on sale, and when a game becomes free to keep.</string>
+    <string name="settings_alerts_note">Checked about once an hour in the background, including when the app is closed. Only changes are announced: a game that is still on sale tomorrow is not announced again. A game that is already on sale when you turn this on is not announced either — the check starts from now.</string>
+    <string name="settings_alerts_permission_needed">Notifications are blocked for Discount Hunter, so alerts cannot be shown. Allow them in the system settings.</string>
+    <string name="settings_alerts_open_settings">Open settings</string>
+    <string name="alert_channel_sales">Sales on your wishlist</string>
+    <string name="alert_channel_sales_description">A game you saved has started being discounted.</string>
+    <string name="alert_channel_free">Free games</string>
+    <string name="alert_channel_free_description">A game has become free to keep.</string>
+    <string name="alert_sale_title">%1$s is %2$d%% off</string>
+    <string name="alert_sale_body">Now %1$s (was %2$s) on %3$s</string>
+    <string name="alert_sale_body_no_original">Now %1$s on %2$s</string>
+    <string name="alert_free_title">%1$s is free</string>
+    <string name="alert_free_body">Free to keep on %1$s. Claim it before it is gone.</string>
 </resources>

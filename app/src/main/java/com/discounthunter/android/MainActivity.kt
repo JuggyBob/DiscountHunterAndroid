@@ -63,6 +63,7 @@ import com.discounthunter.android.core.model.SearchResult
 import com.discounthunter.android.core.model.StoreId
 import com.discounthunter.android.core.model.StoreOffer
 import com.discounthunter.android.data.settings.ThemeMode
+import com.discounthunter.android.diagnostics.AppLog
 import com.discounthunter.android.data.store.LinkResult
 import com.discounthunter.android.data.store.StoreLinks
 import com.discounthunter.android.di.AppContainer
@@ -104,13 +105,14 @@ class MainActivity : ComponentActivity() {
      * therefore dropped it on the floor, and the link appeared to do nothing. Writing the new intent
      * back means the same `LaunchedEffect` that handles a cold start handles a warm one.
      */
-    private val pendingDeepLink = MutableStateFlow<Uri?>(null)
+    private val pendingDeepLink = MutableStateFlow<GameReference?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        pendingDeepLink.value = intent?.data
+        AppLog.i("Main: onCreate action=${intent?.action} extras=${intent?.extras?.keySet()} data=${intent?.data}")
+        pendingDeepLink.value = referenceFromIntent(intent)
 
         val container = (application as DiscountHunterApplication).container
 
@@ -138,7 +140,9 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         // Keep getIntent() in step, so anything else reading it sees the newest link.
         setIntent(intent)
-        if (intent.data != null) pendingDeepLink.value = intent.data
+        AppLog.i("Main: onNewIntent action=${intent.action} extras=${intent.extras?.keySet()} data=${intent.data}")
+        val reference = referenceFromIntent(intent)
+        if (reference != null) pendingDeepLink.value = reference
     }
 }
 
@@ -181,7 +185,7 @@ private val TOP_LEVEL = listOf(
 private fun DiscountHunterApp(
     container: AppContainer,
     storeLinks: StoreLinks,
-    deepLink: StateFlow<Uri?>,
+    deepLink: StateFlow<GameReference?>,
     onDeepLinkHandled: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -229,7 +233,7 @@ private fun DiscountHunterApp(
 private fun MainShell(
     container: AppContainer,
     storeLinks: StoreLinks,
-    deepLink: StateFlow<Uri?>,
+    deepLink: StateFlow<GameReference?>,
     onDeepLinkHandled: () -> Unit,
 ) {
     val navController = rememberNavController()
@@ -254,14 +258,11 @@ private fun MainShell(
     // Keyed on the link's *value*, not on the flow. `LaunchedEffect` compares its keys with equals,
     // and a `StateFlow` instance equals itself forever, so keying on the flow runs this exactly once
     // — which would quietly drop every link that arrives after the first.
-    val deepLinkUri by deepLink.collectAsStateWithLifecycle()
+    val deepLinkReference by deepLink.collectAsStateWithLifecycle()
 
-    LaunchedEffect(deepLinkUri) {
-        val uri = deepLinkUri ?: return@LaunchedEffect
-        val reference = referenceFromUri(uri)
-        if (reference != null) {
-            navController.navigate(Destinations.detailRoute(reference.identity, reference.title))
-        }
+    LaunchedEffect(deepLinkReference) {
+        val reference = deepLinkReference ?: return@LaunchedEffect
+        navController.navigate(Destinations.detailRoute(reference.identity, reference.title))
         onDeepLinkHandled()
     }
 
@@ -498,14 +499,41 @@ private fun referenceFromArguments(
 }
 
 /**
- * Resolves an incoming deep link to a game.
+ * Resolves an incoming intent to a game.
  *
  * Two shapes are understood:
- *  * the stores' own web addresses, via [GameIdentity.fromUrl];
- *  * the app's own scheme, `discounthunter://<store>/<id>` — where the store is the *host* and the
- *    id is the first path segment, so `discounthunter://steam/1245620` opens the same game as the
- *    Steam URL. Reading the host alone would have produced the id `"steam"` and a page for a game
- *    that does not exist.
+ *
+ *  * **Extras** — how a notification tap arrives. The store and the id are carried as extras
+ *    rather than in a URI, because a URI in a notification's intent was measured arriving with
+ *    `data == null`: the intent the activity received was not the one that had been built. Extras
+ *    are copied verbatim, so they cannot be lost that way.
+ *  * **A URI** — the stores' own web addresses via [GameIdentity.fromUrl], and the app's own
+ *    scheme, `discounthunter://<store>/<id>`, where the store is the *host* and the id is the
+ *    first path segment. Reading the host alone would have produced the id `"steam"` and a page
+ *    for a game that does not exist.
+ *
+ * A `title` may come with either, and it matters. Without a title the detail page has to work
+ * the game's name out for itself, and for GOG that means a catalogue *search* by title — which
+ * returns unrelated products for anything but the most distinctive of names, so the page ends up
+ * with the wrong offer or none. The title is a hint, never an identity: the id still decides which
+ * game this is.
+ */
+private fun referenceFromIntent(intent: Intent?): GameReference? {
+    if (intent == null) return null
+
+    val storeName = intent.getStringExtra(Destinations.EXTRA_STORE)?.trim().orEmpty()
+    val id = intent.getStringExtra(Destinations.EXTRA_ID)?.trim().orEmpty()
+    if (storeName.isNotEmpty() && id.isNotEmpty()) {
+        val identity = GameIdentity.parse("$storeName:$id") ?: return null
+        val title = intent.getStringExtra(Destinations.EXTRA_TITLE)?.trim().orEmpty()
+        return GameReference(identity = identity, title = title)
+    }
+
+    return referenceFromUri(intent.data)
+}
+
+/**
+ * Resolves a deep link to a game.
  */
 private fun referenceFromUri(uri: Uri?): GameReference? {
     val data = uri?.toString() ?: return null
@@ -515,7 +543,8 @@ private fun referenceFromUri(uri: Uri?): GameReference? {
         val id = uri.pathSegments.firstOrNull()?.trim().orEmpty()
         if (store.isEmpty() || id.isEmpty()) return null
         val identity = GameIdentity.parse("$store:$id") ?: return null
-        return GameReference(identity = identity, title = "", originUrl = data)
+        val title = uri.getQueryParameter("title")?.trim().orEmpty()
+        return GameReference(identity = identity, title = title, originUrl = data)
     }
 
     val identity = GameIdentity.fromUrl(data) ?: return null

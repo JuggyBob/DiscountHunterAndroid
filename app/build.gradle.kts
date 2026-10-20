@@ -35,8 +35,8 @@ android {
         applicationId = "com.discounthunter.android"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0-release"
+        versionCode = 2
+        versionName = "1.1.0-release"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -137,6 +137,9 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.ui)
+    // The background check. WorkManager is the officially supported way to do work that must
+    // survive the app being closed, and it reschedules itself after a reboot.
+    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

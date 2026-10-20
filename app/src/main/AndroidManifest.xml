@@ -4,6 +4,20 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+        The background check needs to be able to tell the user about a sale, and to keep doing so
+        after a reboot. Without the boot permission the schedule is silently lost on restart,
+        which is one of the ways "the notifications stopped working" happens.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!--
+        Exact alarms make the check punctual rather than batched. The user can refuse this
+        permission, so the scheduler asks first and falls back to an inexact alarm, which still
+        works inside Doze.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
     <application
         android:name=".DiscountHunterApplication"
         android:allowBackup="true"
@@ -73,6 +87,32 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/diagnostics_paths" />
         </provider>
+        <!--
+            The punctual half of the background check. WorkManager's periodic worker is the
+            guaranteed half; this alarm is the one that is actually on time. Both queue the same
+            idempotent worker, so whichever fires first does the work.
+        -->
+        <receiver
+            android:name=".alerts.DealAlertReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.discounthunter.android.action.CHECK_DEALS" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            Alarms do not survive a reboot, so the schedule is restored here. The user's setting
+            is the source of truth: a reboot must not switch monitoring back on if it was off.
+        -->
+        <receiver
+            android:name=".alerts.BootReceiver"
+            android:exported="true"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

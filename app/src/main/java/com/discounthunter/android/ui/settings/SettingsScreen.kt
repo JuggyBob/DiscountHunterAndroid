@@ -27,6 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.os.Build
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -75,6 +78,24 @@ fun SettingsScreen(
     var accountFor by remember { mutableStateOf<StoreId?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     var confirmDeleteAll by remember { mutableStateOf(false) }
+
+    // The notification permission is requested from the screen, because a ViewModel has no
+    // activity to attach a permission dialog to. The request is made when the user switches the
+    // feature on, which is the moment the permission actually starts to matter.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.refreshNotificationPermission()
+    }
+
+    val requestNotifications = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.refreshNotificationPermission()
+        }
+        Unit
+    }
 
     // Re-probe installed store apps whenever the screen becomes visible.
     LaunchedEffect(Unit) {
@@ -196,6 +217,46 @@ fun SettingsScreen(
                     checked = state.settings.preferStoreApps,
                     onCheckedChange = viewModel::setPreferStoreApps,
                 )
+            }
+
+            // ---- deal alerts ----
+            //
+            // Its own card rather than another switch under "Deal feed", because this is the only
+            // feature in the app that does something *when the app is not running*, and it deserves
+            // to say so.
+            SettingsCard(title = stringResource(R.string.settings_alerts_title)) {
+                SwitchRow(
+                    title = stringResource(R.string.settings_alerts_title),
+                    subtitle = stringResource(R.string.settings_alerts_summary),
+                    checked = state.settings.saleAlertsEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) requestNotifications()
+                        viewModel.setSaleAlertsEnabled(enabled)
+                    },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_alerts_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                // The switch can be on and the feature still be unable to do anything, because
+                // Android 13 and above need notifications to be granted explicitly. Saying so, and
+                // offering the one place it can be changed, is the difference between a setting
+                // that works and a setting that quietly does nothing.
+                if (state.settings.saleAlertsEnabled && !state.notificationsAllowed) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.settings_alerts_permission_needed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = viewModel::openNotificationSettings) {
+                        Text(stringResource(R.string.settings_alerts_open_settings))
+                    }
+                }
             }
 
             // ---- accounts ----

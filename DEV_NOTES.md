@@ -685,6 +685,109 @@ and the animation body is wrapped so a cancellation cannot escape as a crash.
 
 Verified with ~150 rapid toggles including 60 at 25 ms intervals on a single row, with and without
 scrolling: no crash, and the reorder animation is visibly back.
+### 4.39 The background check never ran at all
+
+The feature was built, the schedule armed, the alarm registered with the system — and the check
+never completed. The worker started, produced no log line, no notification, and no error.
+
+`WishlistRepository.loadOnce()` looked like this:
+
+```kotlin
+suspend fun loadOnce() {
+    val snapshot = settings.settings.map { it.wishlist }.distinctUntilChanged()
+    var first: List<WishlistEntry>? = null
+    snapshot.collect { value -> first = value.map { it.toEntry() } }
+    rebuild(first.orEmpty())
+}
+```
+
+`collect` on a DataStore flow **never returns** — the flow stays open for as long as the process
+lives. So a caller that awaited `loadOnce()` waited forever. The background worker did exactly
+that: it started, blocked on the wishlist load, and hung. There was no exception and no crash
+report, because nothing was wrong: the code was waiting for something that was never going to
+happen.
+
+It now reads the current value with `first()`. The function was only ever *used* by tests, where
+the flow completed and the bug could not show.
+
+### 4.40 Two scheduling policies, both wrong
+
+The one-shot check is enqueued under a unique name so that overlapping triggers cannot pile up.
+Both obvious policies are wrong, and both were wrong in practice:
+
+  * **`REPLACE`** cancels whatever is already running. The alarm and the periodic worker can fire
+    within seconds of each other, and that became a cancellation storm: each new request killed the
+    one that had just started, so no check ever completed. The log showed
+    `Work [...] was cancelled` immediately followed by `Starting work for DealAlertWorker`.
+  * **`KEEP`** never cancels, but a work that is stuck in a queued state — waiting for a network
+    that is not coming — blocks every later request under the same name. The checks then stop
+    happening, silently.
+
+The request is now simply enqueued, with no unique name. Overlapping runs are harmless: the
+notification for a game is posted under that game's own tag and id, so a second post *replaces* the
+first rather than adding to the shade. The user sees one notification either way. A process-wide
+mutex inside the worker serialises the runs so they do not fetch the same feed twice.
+
+### 4.41 A notification's URI arrived with `data == null`
+
+Tapping a notification opened the app and went nowhere.
+
+The intent was built with the game's URI, and the log confirmed the intent that was *built* was
+correct:
+
+```
+Alerts: tap target for 'Dance of Cards Soundtrack' is
+  discounthunter://gog/dance_of_cards_soundtrack?title=Dance%20of%20Cards%20Soundtrack
+```
+
+But the intent that *arrived* had no data at all:
+
+```
+Main: onNewIntent action=android.intent.action.VIEW extras=[] data=null
+```
+
+Making the intent explicit, and dropping `FLAG_ACTIVITY_CLEAR_TOP`, changed nothing — the data was
+still null. The fix was to stop using a URI: the identity now travels in **intent extras**, which
+are copied verbatim and cannot be dropped the way a URI data can be.
+
+The extras also carry the game's **title**, and that matters for a different reason. Without a
+title the detail page has to look the game up by name, and for GOG that means a catalogue *search* —
+which returns unrelated products for anything but a distinctive name, so the page showed the wrong
+offer, or none. With the title the page resolves correctly and the price on it matches the
+notification exactly: `$0.25 (was $4.99, -95%)` in both places.
+
+### 4.42 A free game was announced twice
+
+A wishlisted game that is free was announced by the free-game path *and* as a sale, so it produced
+two notifications: "Agent A is free" and "Agent A is 100% off". The second is the less useful of
+the two, and the duplicate is the kind of thing that makes people turn a feature off.
+
+A free deal is now skipped by the sale path, and its record is cleared so that if the game later
+becomes a *paid* discount, that is announced as a sale.
+### 4.43 The release build crashed on launch, and the debug build did not
+
+The most expensive bug in this round, and it was invisible until the *release* APK was installed.
+
+```
+java.lang.RuntimeException: Unable to get provider androidx.startup.InitializationProvider
+Caused by: java.lang.NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init> []
+```
+
+WorkManager keeps its schedule in a Room database, and Room instantiates the generated
+implementation reflectively — `WorkDatabase_Impl`, by name, with a no-argument constructor. R8
+cannot see that call, so it removed the class.
+
+The debug build was fine, because R8 only runs for release. Every debug test, every emulator run
+and every unit test passed; the crash only ever appeared in the one build that would have been
+shipped. That is the shape of bug that reaches users and never reaches the person developing it,
+and the only defence is to install the release APK before believing anything.
+
+The fix is two keep rules in `proguard-rules.pro`:
+
+```
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class androidx.work.impl.** { *; }
+```
 ---
 
 ## 5. Design decisions worth explaining
@@ -699,6 +802,34 @@ results keep the stores' relevance order — among those, the store's own rankin
 answer available. The same rule is deliberately *not* applied to the feed (§4.30): search caps at
 25 rows and the user is looking at a handful, so the placement animations are bounded, whereas the
 feed reorders ninety grid rows on every tap.
+**The background check runs on two mechanisms, because one is never enough.** The single most
+common reason an app's notifications "do not always work" is that it relies on one mechanism, and
+that mechanism has a hole. `WorkManager` is the officially supported way to do background work and it
+survives reboots, but a *periodic* worker is a request rather than a promise: the system batches
+and defers it, Doze pushes it out, and several manufacturers' battery managers delay it further. An
+alarm is punctual and `setAndAllowWhileIdle` is delivered inside a Doze window, but alarms do not
+survive a reboot on their own and an app that is force-stopped loses them. So both are used: the
+alarm is the punctual path and the periodic worker is the guaranteed backstop, and both end up
+running the same idempotent check.
+
+The exact-alarm permission is asked for, not assumed. `canScheduleExactAlarms()` is checked and the
+scheduler falls back to `setAndAllowWhileIdle`, which needs no permission and still works inside
+Doze. A less punctual notification is much better than none.
+
+**A notification carries a game's identity in extras, not in a URI.** A URI in a notification's
+intent was measured arriving with `data == null` — the intent the activity received was not the one
+that had been built — so the notification opened the app without going anywhere. Extras are copied
+verbatim and cannot be lost that way. They also carry the title, which the detail page needs: for
+GOG, looking a game up by name means a catalogue search, and that returns unrelated products for
+anything but a distinctive title, so the page showed the wrong offer or none.
+
+**Only changes are announced, and absence is not evidence.** A check runs on a timer, so the same
+deals are seen over and over. What is worth telling someone about is a *change*: a wishlisted game
+that has started being discounted, and a game that has become free. A game that is still discounted
+next hour is not news. When a wishlisted game is missing from the feed its record is left alone —
+the feed holds only the top few dozen discounts per store, so dropping out of it says nothing about
+whether the game is still discounted. The record is only cleared when the game is *seen* and is not
+discounted, which is the one observation that proves the sale ended.
 **The app keeps its own log.** `AppLog` is a bounded ring buffer of the last few hundred state
 transitions and caught failures, written to a shareable file from Settings. `adb logcat` is not an
 answer for a user without a computer, and by the time someone thinks to report a crash the buffer

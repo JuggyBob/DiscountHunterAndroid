@@ -73,25 +73,56 @@ jobs:
         # Never ship a red build, however tempting the tag feels.
         run: ./gradlew testDebugUnitTest lintDebug --stacktrace
 
-      # To sign releases, add a keystore as a repository secret and uncomment:
+      # ------------------------------------------------------------------ signing
       #
-      # - name: Decode signing key
-      #   run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > release.jks
+      # The keystore lives in a repository secret, never in the repository. `assembleRelease`
+      # without one falls back to the shared debug key, which produces an APK that installs but
+      # cannot be upgraded over an existing install — so a signed build is not a nicety here, it is
+      # the difference between "updatable" and "you have to uninstall first".
       #
-      # - name: Sign release APK
-      #   run: |
-      #     $ANDROID_HOME/build-tools/*/apksigner sign \
-      #       --ks release.jks \
-      #       --ks-pass env:KS_PASS \
-      #       --key-pass env:KEY_PASS \
-      #       --out app-release-signed.apk \
-      #       app/build/outputs/apk/release/app-release-unsigned.apk
+      # The values are handed to the build as environment variables rather than written into
+      # `keystore.properties`, because `app/build.gradle.kts` already reads `STORE_FILE`,
+      # `STORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` from the environment as a fallback. That
+      # keeps the secret out of the filesystem entirely, and keeps the signing configuration in one
+      # place instead of a second, divergent one in this workflow.
+      - name: Restore the signing key
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > release-key.p12
+          # Written to $GITHUB_ENV, not echoed: the value goes into the file, not the log.
+          echo "STORE_FILE=$GITHUB_WORKSPACE/release-key.p12" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=key0" >> "$GITHUB_ENV"
+          echo "STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "the signing key has been restored"
+
+      - name: Refuse to publish without a signing key
+        # A release signed with the wrong key is worse than no release: it installs once and then
+        # refuses to update, and the user has to uninstall and lose their settings. Failing here
+        # is the point.
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 == '' }}
+        run: |
+          echo "::error::RELEASE_KEYSTORE_BASE64 is not set, so the release would be signed with the debug key."
+          echo "::error::Add the keystore as a repository secret and re-run the release."
+          exit 1
 
       - name: Build release APK
         run: ./gradlew assembleRelease --stacktrace
 
+      - name: Verify the signature
+        # A release that is not signed with the release key is worse than no release: it installs
+        # once and then refuses to update. Checked here, before anything is published.
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/*.apk
+          echo "signature verified"
+
       - name: Rename the APK with its version
-        # `1.0.0.apk` in the downloads list beats `app-release.apk`.
+        # `1.1.0.apk` in the downloads list beats `app-release.apk`.
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/*.apk "dist/discount-hunter-${{ steps.version.outputs.name }}.apk"
@@ -111,11 +142,12 @@ jobs:
 
             ### Installing
 
-            The APK is unsigned, so Android will ask you to allow installation from your file
-            manager the first time. To sign it yourself, see the commented signing step in
-            `.github/workflows/release.yml`.
+            The APK is signed with the release key, so it installs over any earlier version
+            without an uninstall. If your device warns about an unknown source, allow your file
+            manager to install apps — that is the one prompt Android asks for.
 
             ### Verifying the build
 
             `ubuntu-latest`, JDK 17, `./gradlew testDebugUnitTest lintDebug assembleRelease`.
-            Every APK here was produced by that exact command.
+            Every APK here was produced by that exact command, and its signature is verified
+            before it is published.

@@ -28,6 +28,14 @@ data class AppSettings(
     val autoplayTrailers: Boolean = false,
     /** Prefer a store's own app over the browser when both are available. */
     val preferStoreApps: Boolean = true,
+    /**
+     * Whether to check for sales and free games in the background.
+     *
+     * On by default. The point of the feature is to be told about a discount the user is not
+     * looking at the app for, and a setting that stays off until it is discovered is a setting
+     * nobody ever turns on.
+     */
+    val saleAlertsEnabled: Boolean = true,
     val recentSearches: List<String> = emptyList(),
     val linkedAccounts: Map<StoreId, String> = emptyMap(),
     val wishlist: List<WishlistEntryRecord> = emptyList(),

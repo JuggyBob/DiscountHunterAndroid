@@ -6,7 +6,7 @@ Kotlin + Jetpack Compose, Material 3, single activity, bottom navigation, no Web
 The port keeps the behaviour of the PC app and fixes the bugs that were found in it while porting —
 most importantly the one where a game's detail page showed **another game's screenshots and
 trailers**. It also fixes a handful of bugs that only appear on a real device, listed at the bottom
-of this file and detailed in [DEV_NOTES.md](../DEV_NOTES.md).
+of this file and detailed in [DEV_NOTES.md](DEV_NOTES.md).
 
 ---
 
@@ -374,7 +374,31 @@ Run a single suite:
     hardened instead: the star's pop was keyed on `isSaved`, so every tap cancelled a running spring
     and queued another. It is now keyed on a tick that only advances when the pop should play.
     Verified with ~150 rapid toggles, including 60 at 25 ms intervals on one row.
-Full write-up with the reasoning in [DEV_NOTES.md](../DEV_NOTES.md).
+43. **The background check never ran at all.** `WishlistRepository.loadOnce()` awaited a DataStore
+    flow with `collect`, which never returns — the flow stays open for the life of the process. The
+    worker started, blocked on the wishlist load, and hung with no error and no crash report. It
+    now reads the current value with `first()`.
+44. **Two scheduling policies, both wrong.** `REPLACE` cancelled the in-flight check, and because
+    the alarm and the periodic worker can fire together that became a cancellation storm where no
+    check ever completed. `KEEP` fixed that but let a work stuck in a queued state block every
+    later request under the same name, so the checks stopped silently. The request is now simply
+    enqueued; overlapping runs are harmless because a notification posted under the same tag and id
+    replaces itself.
+45. **A notification's URI arrived with `data == null`.** The intent that was built was correct and
+    the intent that arrived had no data, so tapping a notification opened the app and went
+    nowhere. The identity now travels in intent extras, which are copied verbatim.
+46. **A free game was announced twice** — as "is free" and as "100% off". A free deal is now
+    skipped by the sale path, and its record cleared so a later paid discount is still announced.
+47. **A notification's deep link showed the wrong price.** Without a title the detail page looks a
+    GOG game up with a catalogue search, which returns unrelated products for anything but a
+    distinctive name. The title now travels with the link, and the page shows the same price the
+    notification did.
+48. **The release build crashed on launch and the debug build did not.** WorkManager keeps its
+    schedule in a Room database, and Room instantiates the generated implementation reflectively —
+    a call R8 cannot see, so R8 removed it. Every debug run passed; the crash existed only in the
+    build that would have been shipped. Fixed with two keep rules, and the release APK is now
+    installed and launched on a device before the work is called done.
+Full write-up with the reasoning in [DEV_NOTES.md](DEV_NOTES.md).
 
 
 ---

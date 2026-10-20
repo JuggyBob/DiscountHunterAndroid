@@ -9,6 +9,62 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet. Open an issue or PR to propose something.
 
+## [1.1.0] - 2026-10-20
+
+Deal alerts: the app now tells you when a game you saved goes on sale, and when a game becomes
+free to keep — with the name, the new price and the discount — and it does so **with the app
+closed**.
+
+### Added
+
+- **Background deal alerts.** A wishlisted game that starts being discounted is announced, with its
+  name, its new price and the discount rate. Free games are announced too, whether or not they are
+  saved. Two notification channels, so "Sales on your wishlist" and "Free games" can be tuned
+  separately.
+- **A Deal alerts switch in Settings**, in its own card, explaining what is checked and how often.
+  When notifications are blocked at the system level, the screen says so and links straight to the
+  system notification settings rather than leaving the switch quietly doing nothing.
+- **Tapping a notification opens that game**, showing the same price the notification did.
+- **Prices in notifications are converted** the same way the app converts them, and marked `~` so a
+  converted figure is never mistaken for a quoted one.
+
+### Fixed
+
+- **The background check never ran at all.** `WishlistRepository.loadOnce()` awaited a DataStore
+  flow with `collect`, which never returns — the flow stays open for the life of the process. The
+  worker started, blocked on the wishlist load, and hung with no error, no crash report and no
+  notification. It now reads the current value with `first()`.
+- **Two scheduling policies, both wrong.** `REPLACE` cancelled the in-flight check, and because the
+  alarm and the periodic worker can fire together that became a cancellation storm in which no check
+  ever completed. `KEEP` fixed that but let a work stuck in a queued state block every later request
+  under the same name, so the checks stopped silently. The request is now simply enqueued;
+  overlapping runs are harmless, because a notification posted under the same tag and id replaces
+  itself rather than adding to the shade.
+- **The release build crashed on launch, and the debug build did not.** WorkManager keeps its
+  schedule in a Room database, and Room instantiates the generated implementation reflectively — a
+  call R8 cannot see, so R8 removed it. Every debug run passed; the crash existed only in the build
+  that would have been shipped. Fixed with two keep rules, and the release APK is now installed and
+  launched on a device before the work is called done.
+- **A notification's URI arrived with `data == null`.** The intent that was built was correct and
+  the intent that arrived had no data, so tapping a notification opened the app and went nowhere.
+  The identity now travels in intent extras, which are copied verbatim and cannot be lost that way.
+- **A notification's deep link showed the wrong price.** Without a title, the detail page looks a
+  GOG game up with a catalogue search, and that returns unrelated products for anything but a
+  distinctive name. The title now travels with the link, and the page shows the same price the
+  notification did.
+- **A free game was announced twice** — as "is free" and as "100% off". A free deal is now skipped
+  by the sale path, and its record cleared so that a later paid discount is still announced.
+
+### Changed
+
+- The check runs on **two** mechanisms rather than one: an `AlarmManager` alarm, which is punctual
+  and Doze-aware, and a WorkManager periodic job, which is guaranteed and survives a reboot. Both
+  end up running the same idempotent check, so overlapping triggers cannot double-notify.
+- The exact-alarm permission is asked for rather than assumed. If it is refused, the scheduler falls
+  back to an inexact alarm, which still works inside Doze — a later notification beats none.
+- The background check fetches a larger feed than the app shows, so a wishlisted game at a shallow
+  discount is not missed below the cut-off.
+
 ## [1.0.0] - 2026-10-11
 
 The first public release: a native Android port of the Discount Hunter desktop app, plus the fixes
@@ -134,5 +190,7 @@ failure mode behind every one.
   reachable through deep links rather than being scraped, because most of them block programmatic
   access.
 
-[Unreleased]: https://github.com/JuggyBob/DiscountHunterAndroid/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.0.0
+
+[Unreleased]: https://github.com/JuggyBob/DiscountHunterAndroid/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.1.0

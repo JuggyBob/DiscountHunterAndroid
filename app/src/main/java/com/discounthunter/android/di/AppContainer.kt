@@ -1,6 +1,9 @@
 package com.discounthunter.android.di
 
 import android.content.Context
+import com.discounthunter.android.alerts.AlertNotifier
+import com.discounthunter.android.alerts.DealAlertScheduler
+import com.discounthunter.android.alerts.WatchStateStore
 import com.discounthunter.android.core.model.FxRates
 import com.discounthunter.android.data.cache.PayloadCache
 import com.discounthunter.android.data.cache.SnapshotStore
@@ -20,6 +23,7 @@ import com.discounthunter.android.data.wishlist.WishlistRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.io.File
@@ -43,7 +47,9 @@ class AppContainer(
     val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
-    private val appContext: Context = context.applicationContext
+    /** The application context. Public because the background check and the Settings screen both
+     *  need it, and neither of them should ever hold an Activity. */
+    val appContext: Context = context.applicationContext
 
     /** One HTTP client for store traffic and artwork, so sockets and timeouts stay bounded. */
     val httpClient: OkHttpClient = HttpClient.buildDefault()
@@ -113,6 +119,17 @@ class AppContainer(
 
     val wishlist: WishlistRepository = WishlistRepository(settings, applicationScope)
 
+    /**
+     * Where the record of what has already been announced is kept.
+     *
+     * In `filesDir`, not `cacheDir`: the system may clear the cache at any time, and losing this
+     * record would mean announcing every current sale again.
+     */
+    val watchStateFile: File = File(appContext.filesDir, "alerts/watch-state.json")
+
+    /** The store behind the background announcements. */
+    val watchStateStore = WatchStateStore(watchStateFile)
+
     // The services are wrapped in their source interfaces so the repositories depend on a small,
     // testable surface rather than on the full network stack.
     private val steam = SteamSourceAdapter(SteamService(network, payloadCache))
@@ -152,5 +169,32 @@ class AppContainer(
         // network, and a failure here leaves prices labelled in their own currency, which is a
         // usable fallback rather than a broken screen.
         applicationScope.launch { fxRates.ensure() }
+
+        // The background check. Started here rather than only when the user opens Settings, so the
+        // feature works from the moment it is enabled - the user's setting is the source of truth,
+        // and this is the one place that knows about it.
+        applicationScope.launch {
+            val enabled = runCatching { settings.settings.first() }.getOrNull()?.saleAlertsEnabled
+            if (enabled == true) {
+                AlertNotifier(appContext, fxRates).ensureChannels()
+                DealAlertScheduler.start(appContext)
+            }
+        }
+    }
+
+    /**
+     * Turns the background announcements on or off, and applies the change immediately.
+     *
+     * The schedule lives outside the app's process, so changing the setting has to reach it
+     * explicitly - otherwise the user would switch the feature off and keep getting notifications.
+     */
+    suspend fun setSaleAlertsEnabled(enabled: Boolean) {
+        settings.setSaleAlertsEnabled(enabled)
+        if (enabled) {
+            AlertNotifier(appContext, fxRates).ensureChannels()
+            DealAlertScheduler.start(appContext)
+        } else {
+            DealAlertScheduler.stop(appContext)
+        }
     }
 }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -60,14 +61,21 @@ class WishlistRepository(
         }
     }
 
-    /** Seeds the in-memory list without keeping a collector alive (used by tests). */
+    /**
+     * Seeds the in-memory list from storage, without keeping a collector alive.
+     *
+     * Used by the background check, which may be the first thing to run in a fresh process, and
+     * by the tests.
+     *
+     * It reads the current value with [first] rather than collecting. Collecting a DataStore flow
+     * never returns — the flow stays open for as long as the process lives — so a caller that
+     * awaited this would wait forever. The background check did exactly that, and the check
+     * silently never completed: the worker started, blocked here, and produced neither a
+     * notification nor an error.
+     */
     suspend fun loadOnce() {
-        val snapshot = settings.settings.map { it.wishlist }.distinctUntilChanged()
-        var first: List<WishlistEntry>? = null
-        snapshot.collect { value ->
-            first = value.map { it.toEntry() }
-        }
-        rebuild(first.orEmpty())
+        val snapshot = settings.settings.map { it.wishlist }.distinctUntilChanged().first()
+        rebuild(snapshot.map { it.toEntry() })
     }
 
     /** True when the game described by [exactKey] / [titleKey] is saved. */
