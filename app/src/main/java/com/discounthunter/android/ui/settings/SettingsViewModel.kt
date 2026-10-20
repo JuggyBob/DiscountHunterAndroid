@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.discounthunter.android.alerts.AlertNotifier
 import com.discounthunter.android.core.model.StoreId
 import com.discounthunter.android.data.settings.AppSettings
 import com.discounthunter.android.data.settings.CurrencyCode
@@ -33,6 +34,14 @@ data class SettingsUiState(
     val isDeletingData: Boolean = false,
     /** Whether a store app that handles its deep links is installed. */
     val storeApps: Map<StoreId, Boolean> = emptyMap(),
+    /**
+     * Whether the app is allowed to post notifications.
+     *
+     * False on Android 12 and below only if the user blocked them in system settings; on Android 13
+     * and above it is false until the permission is granted. The deal-alerts switch can be on
+     * while this is false, which is exactly the state that makes the feature look broken.
+     */
+    val notificationsAllowed: Boolean = true,
 )
 
 /**
@@ -52,20 +61,42 @@ class SettingsViewModel(
     private val clearing = MutableStateFlow(false)
     private val deleting = MutableStateFlow(false)
     private val detectedApps = MutableStateFlow(StoreId.MAJOR.associateWith { false })
+    private val notificationsAllowed = MutableStateFlow(true)
+
+    /**
+     * The state this screen owns itself, as opposed to state that comes from the repository.
+     *
+     * Grouped into one flow because `combine` has typed overloads for up to five flows, and this
+     * screen has more state than that once the notification permission is added.
+     */
+    private data class LocalFlags(
+        val cacheSize: Long,
+        val clearing: Boolean,
+        val deleting: Boolean,
+        val notificationsAllowed: Boolean,
+    )
+
+    private val localFlags = combine(
+        cacheSize,
+        clearing,
+        deleting,
+        notificationsAllowed,
+    ) { size, isClearing, isDeleting, allowed ->
+        LocalFlags(size, isClearing, isDeleting, allowed)
+    }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         settingsRepository.settings,
-        cacheSize,
-        clearing,
         detectedApps,
-        deleting,
-    ) { settings, size, isClearing, apps, isDeleting ->
+        localFlags,
+    ) { settings, apps, flags ->
         SettingsUiState(
             settings = settings,
-            cacheSizeBytes = size,
-            isClearingCache = isClearing,
-            isDeletingData = isDeleting,
+            cacheSizeBytes = flags.cacheSize,
+            isClearingCache = flags.clearing,
+            isDeletingData = flags.deleting,
             storeApps = apps,
+            notificationsAllowed = flags.notificationsAllowed,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -78,6 +109,7 @@ class SettingsViewModel(
             .onEach { measureCache() }
             .launchIn(viewModelScope)
         refreshStoreApps()
+        refreshNotificationPermission()
     }
 
     // ------------------------------------------------------------------ actions
@@ -101,6 +133,46 @@ class SettingsViewModel(
 
     fun setPreferStoreApps(enabled: Boolean) =
         viewModelScope.launch { settingsRepository.setPreferStoreApps(enabled) }
+
+    /**
+     * Turns the background announcements on or off.
+     *
+     * The change is applied to the schedule as well as to the setting. The schedule lives outside
+     * the app's process, so writing the setting alone would leave the checks running and the
+     * notifications arriving after the user had switched the feature off.
+     *
+     * The notification permission is requested by the screen, not here: a ViewModel has no
+     * activity to ask, and reaching for one is how a permission dialog ends up attached to
+     * nothing.
+     */
+    fun setSaleAlertsEnabled(enabled: Boolean) = viewModelScope.launch {
+        container.setSaleAlertsEnabled(enabled)
+        refreshNotificationPermission()
+    }
+
+    /**
+     * Opens the system notification settings for this app.
+     *
+     * Once the permission has been refused, Android does not show the dialog again — the only way
+     * back is the settings screen, so that is where the button leads.
+     */
+    fun openNotificationSettings() {
+        val context = container.appContext
+        val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+        } else {
+            android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(android.net.Uri.fromParts("package", context.packageName, null))
+        }
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
+    }
+
+    /** Re-reads whether notifications are allowed, so the screen stops warning once they are. */
+    fun refreshNotificationPermission() {
+        notificationsAllowed.value = AlertNotifier(container.appContext).canPost()
+    }
 
     fun linkAccount(store: StoreId, name: String?) =
         viewModelScope.launch { settingsRepository.setLinkedAccount(store, name) }

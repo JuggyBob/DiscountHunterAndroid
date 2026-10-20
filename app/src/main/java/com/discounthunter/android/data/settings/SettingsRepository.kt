@@ -64,6 +64,9 @@ class SettingsRepository(context: Context) {
 
     suspend fun setPreferStoreApps(enabled: Boolean) = edit { it[KEY_STORE_APPS] = enabled }
 
+    /** Turns the background sale and free-game announcements on or off. */
+    suspend fun setSaleAlertsEnabled(enabled: Boolean) = edit { it[KEY_SALE_ALERTS] = enabled }
+
     suspend fun rememberSearch(query: String) = edit { preferences ->
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return@edit
@@ -105,6 +108,7 @@ class SettingsRepository(context: Context) {
                 .coerceIn(AppSettings.MIN_DEAL_LIMIT, AppSettings.MAX_DEAL_LIMIT),
             autoplayTrailers = this[KEY_AUTOPLAY] ?: false,
             preferStoreApps = this[KEY_STORE_APPS] ?: true,
+            saleAlertsEnabled = this[KEY_SALE_ALERTS] ?: true,
             recentSearches = decodeSearches(this[KEY_SEARCHES]),
             linkedAccounts = decodeAccounts(this[KEY_ACCOUNTS]),
             wishlist = decodeWishlist(this[KEY_WISHLIST]),
@@ -220,6 +224,7 @@ class SettingsRepository(context: Context) {
         val KEY_DEAL_LIMIT = intPreferencesKey("deal_limit")
         val KEY_AUTOPLAY = booleanPreferencesKey("autoplay_trailers")
         val KEY_STORE_APPS = booleanPreferencesKey("prefer_store_apps")
+    val KEY_SALE_ALERTS = booleanPreferencesKey("sale_alerts_enabled")
         val KEY_SEARCHES = stringPreferencesKey("recent_searches")
         val KEY_ACCOUNTS = stringPreferencesKey("linked_accounts")
         val KEY_WISHLIST = stringPreferencesKey("wishlist")
