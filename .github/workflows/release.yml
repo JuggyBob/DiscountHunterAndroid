@@ -126,6 +126,48 @@ jobs:
           cp app/build/outputs/apk/release/*.apk "dist/discount-hunter-${{ steps.version.outputs.name }}.apk"
           ls -la dist/
 
+      # The release notes carry the changelog for this version, taken from CHANGELOG.md, so the
+      # two can never drift apart. Hand-copying the changelog into the release body is how they
+      # start disagreeing - and a release whose notes disagree with the changelog is worse than one
+      # that links to it.
+      - name: Build the release notes from the changelog
+        run: |
+          VERSION="${{ steps.version.outputs.name }}"
+          # `index()` rather than a regular expression: inside an awk string, "\[" is an unknown
+          # escape and is silently reduced to "[", which turns the pattern into a character class
+          # and matches nothing at all. Plain substring matching has no escaping to get wrong.
+          SECTION=$(awk -v want="$VERSION" '
+            index($0, "## [" want "]") == 1 { inside=1; next }
+            inside && index($0, "## [") == 1 { exit }
+            inside { print }
+          ' CHANGELOG.md)
+          {
+            echo "## Discount Hunter $VERSION"
+            echo
+            echo "See [CHANGELOG.md](CHANGELOG.md) for the full history."
+            echo
+            echo "### Installing"
+            echo
+            echo "The APK is signed with the release key, so it installs over any earlier version"
+            echo "without an uninstall. If your device warns about an unknown source, allow your"
+            echo "file manager to install apps - that is the one prompt Android asks for."
+            echo
+            echo "### Verifying the build"
+            echo
+            echo "\`ubuntu-latest\`, JDK 17, \`./gradlew testDebugUnitTest lintDebug assembleRelease\`."
+            echo "Every APK here was produced by that exact command, and its signature is verified"
+            echo "before it is published."
+            echo
+            echo "---"
+            echo
+            echo "### Changelog"
+            echo
+            echo "$SECTION"
+            echo
+            echo "---"
+          } > release-notes.md
+          cat release-notes.md
+
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
@@ -133,19 +175,6 @@ jobs:
           name: Discount Hunter ${{ steps.version.outputs.name }}
           generate_release_notes: true
           files: dist/*.apk
-          body: |
-            ## Discount Hunter ${{ steps.version.outputs.name }}
-
-            See [CHANGELOG.md](CHANGELOG.md) for what changed.
-
-            ### Installing
-
-            The APK is signed with the release key, so it installs over any earlier version
-            without an uninstall. If your device warns about an unknown source, allow your file
-            manager to install apps — that is the one prompt Android asks for.
-
-            ### Verifying the build
-
-            `ubuntu-latest`, JDK 17, `./gradlew testDebugUnitTest lintDebug assembleRelease`.
-            Every APK here was produced by that exact command, and its signature is verified
-            before it is published.
+          # Built from CHANGELOG.md by the step above, so the notes and the changelog cannot
+          # disagree.
+          body_path: release-notes.md
