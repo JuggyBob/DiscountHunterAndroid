@@ -76,8 +76,14 @@ class ApkInstaller(
     fun startInstallation(file: File): Boolean {
         return try {
             val uri = FileProvider.getUriForFile(context, authority(), file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
+            // ACTION_INSTALL_PACKAGE, not ACTION_VIEW with the APK media type.
+            //
+            // ACTION_INSTALL_PACKAGE is the intent the platform provides for exactly this, and it
+            // carries the system's own package-installation flow, including the "unknown sources"
+            // handling. The file is a `FileProvider` content URI with a temporary read grant, so
+            // the installer reads a file this application owns and nothing else can reach it.
+            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                setData(uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }

@@ -77,7 +77,9 @@ class ApkDownloader(
                             // check is here rather than only at the end for that reason.
                             coroutineContext.ensureActive()
                             val count = input.read(buffer)
-                            if (count < 0) break
+                            // `<= 0`, not `< 0`: a read that returns zero is legal for a
+                            // non-blocking stream, and looping on it would spin.
+                            if (count <= 0) break
                             output.write(buffer, 0, count)
                             digest.update(buffer, 0, count)
                             read += count
@@ -86,7 +88,9 @@ class ApkDownloader(
                     }
                 }
 
-                if (read == 0L) {
+                // The file itself is checked, not the counter. This is the artefact that will be
+                // handed to the installer, so it is the thing worth being sure about.
+                if (temporary.length() == 0L) {
                     return@withContext Result.failure(IOException("The downloaded file was empty."))
                 }
 
