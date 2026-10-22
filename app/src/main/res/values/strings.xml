@@ -166,4 +166,7 @@
     <string name="update_no_package">Open the release page below to see what was published.</string>
     <string name="update_permission_needed">Android needs permission to install this app. Allow "Install unknown apps" for Discount Hunter, then try again.</string>
     <string name="update_install_failed">The installer could not be started.</string>
+    <string name="update_install_awaiting">Confirm the installation in the next screen.</string>
+    <string name="update_install_done">The update was installed.</string>
+    <string name="update_install_error">The installation failed.</string>
 </resources>

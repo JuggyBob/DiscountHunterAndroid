@@ -391,6 +391,7 @@ fun SettingsScreen(
             SettingsCard(title = stringResource(R.string.settings_updates)) {
                 val updateState by viewModel.updateState.collectAsStateWithLifecycle()
                 val latestRelease by viewModel.latestRelease.collectAsStateWithLifecycle()
+        val installResult by viewModel.installResult.collectAsStateWithLifecycle()
 
                 Text(
                     text = when (val current = updateState) {
@@ -445,10 +446,12 @@ fun SettingsScreen(
     if (showAbout) {
         val updateState by viewModel.updateState.collectAsStateWithLifecycle()
         val latestRelease by viewModel.latestRelease.collectAsStateWithLifecycle()
+        val installResult by viewModel.installResult.collectAsStateWithLifecycle()
         AboutDialog(
             installedVersionName = BuildConfig.VERSION_NAME,
             updateState = updateState,
             release = latestRelease,
+            installResult = installResult,
             onCheckForUpdates = { viewModel.checkForUpdates() },
             onDownload = { viewModel.downloadUpdate() },
             onInstall = {

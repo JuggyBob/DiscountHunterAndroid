@@ -18,6 +18,7 @@ import com.discounthunter.android.update.ApkInstaller
 import com.discounthunter.android.update.GitHubReleaseService
 import com.discounthunter.android.update.ReleaseInfo
 import com.discounthunter.android.update.UpdateController
+import com.discounthunter.android.update.InstallResults
 import com.discounthunter.android.update.UpdateState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -107,6 +108,7 @@ class SettingsViewModel(
     /** The update state and the latest release, for the about dialog. */
     val updateState: StateFlow<UpdateState> = updateController.state
     val latestRelease: StateFlow<ReleaseInfo?> = updateController.release
+    val installResult: StateFlow<InstallResults.State?> = InstallResults.state
 
     /**
      * The state this screen owns itself, as opposed to state that comes from the repository.
@@ -242,16 +244,19 @@ class SettingsViewModel(
         val file = (state as? UpdateState.ReadyToInstall)?.file
             ?: return InstallOutcome.NothingToInstall
         if (!installer.canRequestInstall()) {
+            // The user has to grant this in system settings; the application cannot ask for it in
+            // a dialog. Send them there and say what to do.
             return if (installer.openInstallPermissionSettings()) {
                 InstallOutcome.PermissionNeeded
             } else {
                 InstallOutcome.Failed("The system settings screen could not be opened.")
             }
         }
-        return if (installer.startInstallation(file)) {
+        InstallResults.reset()
+        return if (installer.install(file)) {
             InstallOutcome.Started
         } else {
-            InstallOutcome.Failed("The package installer could not be started.")
+            InstallOutcome.Failed("The installation could not be started.")
         }
     }
 

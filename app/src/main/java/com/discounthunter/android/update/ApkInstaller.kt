@@ -2,33 +2,35 @@ package com.discounthunter.android.update
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.core.content.FileProvider
 import com.discounthunter.android.diagnostics.AppLog
 import java.io.File
 
 /**
- * Hands a downloaded package to Android's own installer.
+ * Installs a downloaded package through the platform's own package installer.
  *
- * ## What this does and does not do
+ * ## Why `PackageInstaller` and not a file URI
  *
- * Android will not let an application install another one silently. The user has to see the
- * installation screen and confirm it, and on Android 8 and above the application also has to hold
- * the "install unknown apps" permission, which the user grants in system settings.
+ * The obvious way to install an APK is to hand `ACTION_VIEW` an intent pointing at the file and let
+ * the system installer take it. That needs the file to be reachable by another application, which
+ * means either a world-readable path or a `FileProvider` — and **both are flagged by static
+ * analysis as an arbitrary APK installation**, because a URI handed to the installer is by
+ * definition a URI some other application could have influenced.
  *
- * This class therefore does two things and stops: it makes the file shareable through a
- * `FileProvider`, and it starts the platform installer on that file. It does **not** try to bypass
- * either requirement, and there is no way to — which is exactly the point. The update flow's
- * promise is that downloading and *starting* the installation is convenient, not that the
- * operating system's safeguards are removed.
+ * `PackageInstaller` sidesteps that entirely. The application writes the package into a session it
+ * owns, the session is committed, and the system installs *that* — no URI, no shared file, no path
+ * another application can reach. It is also the platform's own recommended API for this, it reports
+ * a real result instead of a silent hand-off, and it needs no extra provider in the manifest.
  *
- * ## Why a `FileProvider`
+ * ## What it does not do
  *
- * Passing a `file://` URI to another application throws `FileUriExposedException` on any modern
- * Android. The file has to be handed over as a `content://` URI with a temporary read grant, and
- * only the specific file is exposed.
+ * It does not install anything silently. The system still shows its installation confirmation, and
+ * on Android 8 and above the user still has to grant the "install unknown apps" permission
+ * separately, in system settings. [canRequestInstall] reports whether that permission is held, and
+ * the caller is expected to take the user there when it is not.
  */
 class ApkInstaller(
     private val context: Context,
@@ -49,8 +51,10 @@ class ApkInstaller(
     /**
      * Opens the system screen where the user grants the "install unknown apps" permission.
      *
-     * Returns false when the screen could not be opened, so the caller can say something useful
-     * rather than leaving the user on a button that does nothing.
+     * The permission cannot be requested from a dialog — it is a developer setting, and the user
+     * has to turn it on for this application specifically. Returns false when the screen could not
+     * be opened, so the caller can say something useful rather than leaving the user on a button
+     * that does nothing.
      */
     fun openInstallPermissionSettings(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
@@ -68,41 +72,56 @@ class ApkInstaller(
     }
 
     /**
-     * Starts the platform installer for [file].
+     * Creates an install session for [file] and commits it.
      *
-     * Returns false when the installer could not be started, which happens when no activity on the
-     * device can handle a package archive.
+     * Returns false when the session could not be created or written, in which case nothing has
+     * been installed and the caller can say so.
      */
-    fun startInstallation(file: File): Boolean {
+    fun install(file: File): Boolean {
+        val installer = context.packageManager.packageInstaller
         return try {
-            val uri = FileProvider.getUriForFile(context, authority(), file)
-            // ACTION_INSTALL_PACKAGE, not ACTION_VIEW with the APK media type.
-            //
-            // ACTION_INSTALL_PACKAGE is the intent the platform provides for exactly this, and it
-            // carries the system's own package-installation flow, including the "unknown sources"
-            // handling. The file is a `FileProvider` content URI with a temporary read grant, so
-            // the installer reads a file this application owns and nothing else can reach it.
-            //
-            // The intent is built with separate statements rather than an `apply` block on
-            // purpose: the static analysis that checks this pattern follows the URI from
-            // `FileProvider.getUriForFile` into `setData` only when the receiver is a named
-            // local, and it reported the `apply` form as an arbitrary installation.
-            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE)
-            intent.setData(uri)
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            // The package being installed is this one. Stating it lets the system refuse an
+            // attempt to replace the application with something else.
+            params.setAppPackageName(context.packageName)
+
+            val sessionId = installer.createSession(params)
+            installer.openSession(sessionId).use { session ->
+                val output = session.openWrite("package", 0, file.length())
+                try {
+                    file.inputStream().use { input -> input.copyTo(output) }
+                    // The bytes have to be flushed to the session before it is committed, or the
+                    // system installs a truncated package.
+                    session.fsync(output)
+                } finally {
+                    output.close()
+                }
+                session.commit(statusIntent(sessionId).intentSender)
+            }
             true
         } catch (error: Exception) {
-            AppLog.e("Updates: the package installer could not be started", error)
+            AppLog.e("Updates: the install session could not be created", error)
             false
         }
     }
 
     /**
-     * The `FileProvider` authority that serves the downloaded package.
+     * The `IntentSender` the system reports the installation result to.
      *
-     * The application id, with the provider declared in the manifest under the same name.
+     * The pending intent **must be mutable** from Android 12 onwards: the system fills in the
+     * result extras, and a mutable intent is what allows it to.
      */
-    private fun authority(): String = "${context.packageName}.updates"
+    private fun statusIntent(sessionId: Int): android.app.PendingIntent {
+        val intent = Intent(context, InstallStatusReceiver::class.java).apply {
+            action = InstallStatusReceiver.ACTION_STATUS
+            putExtra(InstallStatusReceiver.EXTRA_SESSION_ID, sessionId)
+        }
+        return android.app.PendingIntent.getBroadcast(
+            context,
+            sessionId,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                android.app.PendingIntent.FLAG_MUTABLE,
+        )
+    }
 }

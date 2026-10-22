@@ -122,22 +122,18 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
-        <!--
-            Serves the downloaded release package to Android's package installer.
 
-            A separate provider from the diagnostics one, under its own authority, so that the
-            two concerns cannot be confused: this one exposes exactly the `updates` folder and
-            nothing else, and the diagnostic report can never be reached through it.
+        <!--
+            Receives the result of an installation started by the updater, so the app can tell
+            the user whether the update actually went through rather than leaving them to guess.
         -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.updates"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/update_paths" />
-        </provider>
+        <receiver
+            android:name=".update.InstallStatusReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.discounthunter.android.action.INSTALL_STATUS" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

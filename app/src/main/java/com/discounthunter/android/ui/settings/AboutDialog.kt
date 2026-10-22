@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.discounthunter.android.R
+import com.discounthunter.android.update.InstallResults
 import com.discounthunter.android.update.ReleaseInfo
 import com.discounthunter.android.update.ReleaseNotesFormatter
 import com.discounthunter.android.update.UpdateState
@@ -56,6 +57,7 @@ fun AboutDialog(
     installedVersionName: String,
     updateState: UpdateState,
     release: ReleaseInfo?,
+    installResult: InstallResults.State?,
     onCheckForUpdates: () -> Unit,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
@@ -96,6 +98,8 @@ fun AboutDialog(
                 }
 
                 Spacer(Modifier.height(14.dp))
+                InstallOutcomeText(installResult)
+                Spacer(Modifier.height(14.dp))
                 UpdateStatus(
                     state = updateState,
                     onCheckForUpdates = onCheckForUpdates,
@@ -134,6 +138,38 @@ fun AboutDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.about_close)) }
         },
     )
+}
+
+/**
+ * The outcome of the last installation attempt.
+ *
+ * Shown so the user is not left guessing whether the update went through: the system
+ * installer takes over the screen, and when it finishes the application has to say what
+ * happened.
+ */
+@Composable
+private fun InstallOutcomeText(state: InstallResults.State?) {
+    when (state) {
+        is InstallResults.State.AwaitingConfirmation -> Text(
+            text = stringResource(R.string.update_install_awaiting),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+
+        is InstallResults.State.Completed -> Text(
+            text = stringResource(R.string.update_install_done),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+
+        is InstallResults.State.Failed -> Text(
+            text = stringResource(R.string.update_install_error),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+
+        null -> Unit
+    }
 }
 
 /** A label and its value, stacked. */
