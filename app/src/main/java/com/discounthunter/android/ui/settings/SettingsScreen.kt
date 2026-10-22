@@ -391,7 +391,7 @@ fun SettingsScreen(
             SettingsCard(title = stringResource(R.string.settings_updates)) {
                 val updateState by viewModel.updateState.collectAsStateWithLifecycle()
                 val latestRelease by viewModel.latestRelease.collectAsStateWithLifecycle()
-        val installResult by viewModel.installResult.collectAsStateWithLifecycle()
+                val installResult by viewModel.installResult.collectAsStateWithLifecycle()
 
                 Text(
                     text = when (val current = updateState) {
