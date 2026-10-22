@@ -45,4 +45,17 @@ inline fun <T, R> Outcome<T>.map(transform: (T) -> R): Outcome<R> = when (this) 
     is Outcome.Failure -> this
 }
 
+/**
+ * Collapses an outcome into a single value, handling both branches.
+ *
+ * The same shape as [Result.fold], so that a caller reading either one knows what to expect.
+ */
+inline fun <T, R> Outcome<T>.fold(
+    onSuccess: (T) -> R,
+    onFailure: (Outcome.Failure) -> R,
+): R = when (this) {
+    is Outcome.Success -> onSuccess(value)
+    is Outcome.Failure -> onFailure(this)
+}
+
 fun <T> Outcome<T>.valueOrNull(): T? = (this as? Outcome.Success)?.value

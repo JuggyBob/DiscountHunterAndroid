@@ -27,6 +27,7 @@ games to watch their prices.
 | 🖼️ **Rich detail pages** | Hero art, screenshots, trailers, system requirements, genres, "Where to buy" comparing every store that has the game |
 | 📈 **Price history** | A chart of prices **this device** recorded, with deep links to external databases |
 | 🎨 **Material You** | Follows your system light/dark theme, edge-to-edge, with hand-tuned motion throughout |
+| 🔄 **In-app updates** | Check the official releases from Settings, download a newer version and start Android's installer for it. Plus an About dialog with the release notes |
 | 🔒 **Private by design** | No account, no tracking, no analytics, no API keys. Everything is cached on-device |
 
 <p align="center">
@@ -35,12 +36,17 @@ games to watch their prices.
   <img src="docs/screenshots/08-diagnostics.png" width="32%" alt="Settings, including log export" />
 </p>
 
-## What is new in 1.1.0
+## What is new in 1.1.1
 
-**Deal alerts.** The app now tells you when a game you saved goes on sale, and when a game becomes
-free to keep — with the name, the new price and the discount — and it does so **with the app
-closed**. See [CHANGELOG.md](CHANGELOG.md) for the full list, including the five bugs this release
-fixes along the way.
+**The app can now update itself.** Settings has a *Check for updates* entry that finds a newer
+release, downloads it, and starts Android's own installer for it — and an *About* dialog that shows
+the version you are on, the version published most recently, and the release notes for it, fetched
+from the official GitHub release.
+
+Nothing is fetched until you ask, nothing is downloaded until you ask for that, and the
+installation itself is still confirmed by Android, in the normal way. See
+[CHANGELOG.md](CHANGELOG.md) for the full list.
+
 ## Download
 
 <p align="center">
@@ -135,6 +141,7 @@ app/src/main/java/com/discounthunter/android/
 │   ├── cache/     # Region-scoped snapshots, payload cache
 │   └── repo/      # Repositories merging the stores together
 ├── alerts/        # Background deal alerts: detection, scheduling, notification
+├── update/        # In-app updater: release metadata, download, install
 ├── diagnostics/   # In-app log + crash capture used by the export button
 ├── di/            # AppContainer — the hand-rolled dependency graph
 └── ui/            # Compose screens, one package per screen, plus shared components

@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -57,6 +59,7 @@ import com.discounthunter.android.core.model.StoreId
 import com.discounthunter.android.data.settings.AppSettings
 import com.discounthunter.android.data.settings.CurrencyCode
 import com.discounthunter.android.data.settings.ThemeMode
+import com.discounthunter.android.update.UpdateState
 import kotlin.math.roundToInt
 
 /**
@@ -78,6 +81,7 @@ fun SettingsScreen(
     var accountFor by remember { mutableStateOf<StoreId?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     var confirmDeleteAll by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     // The notification permission is requested from the screen, because a ViewModel has no
     // activity to attach a permission dialog to. The request is made when the user switches the
@@ -379,6 +383,45 @@ fun SettingsScreen(
                 }
             }
 
+            // ---- updates ----
+            //
+            // Its own card, above About, because checking for an update is a deliberate action
+            // and not a detail of the application's identity. The status line reports what is
+            // known without the user having to open a dialog to find out.
+            SettingsCard(title = stringResource(R.string.settings_updates)) {
+                val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+                val latestRelease by viewModel.latestRelease.collectAsStateWithLifecycle()
+
+                Text(
+                    text = when (val current = updateState) {
+                        is UpdateState.Checking -> stringResource(R.string.update_checking)
+                        is UpdateState.UpToDate -> stringResource(R.string.update_up_to_date)
+                        is UpdateState.Available -> stringResource(
+                            R.string.update_available,
+                            current.installed.toString(),
+                            current.release.versionLabel,
+                        )
+                        is UpdateState.Downloading -> stringResource(R.string.update_downloading)
+                        is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready)
+                        is UpdateState.Failed -> current.message
+                        is UpdateState.NoInstallableAsset -> current.reason
+                        UpdateState.Idle -> latestRelease
+                            ?.let { stringResource(R.string.about_latest) + ": " + it.versionLabel }
+                            ?: stringResource(R.string.settings_updates_summary)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = { viewModel.checkForUpdates() },
+                    enabled = updateState !is UpdateState.Checking &&
+                        updateState !is UpdateState.Downloading,
+                ) {
+                    Text(stringResource(R.string.update_check))
+                }
+            }
+
             // ---- about ----
             SettingsCard(title = stringResource(R.string.settings_about)) {
                 Text("Discount Hunter ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
@@ -389,10 +432,42 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(onClick = { showAbout = true }) {
+                    Text(stringResource(R.string.about_title))
+                }
             }
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (showAbout) {
+        val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+        val latestRelease by viewModel.latestRelease.collectAsStateWithLifecycle()
+        AboutDialog(
+            installedVersionName = BuildConfig.VERSION_NAME,
+            updateState = updateState,
+            release = latestRelease,
+            onCheckForUpdates = { viewModel.checkForUpdates() },
+            onDownload = { viewModel.downloadUpdate() },
+            onInstall = {
+                when (viewModel.installUpdate()) {
+                    is InstallOutcome.PermissionNeeded -> Unit
+                    is InstallOutcome.Failed -> Unit
+                    else -> Unit
+                }
+            },
+            onCancel = { viewModel.cancelUpdate() },
+            onOpenReleasePage = { url ->
+                // The release page is the official one from the API, or the releases index when
+                // nothing has been fetched. Either way it is a known address, never one embedded
+                // in release-note text.
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                runCatching { context.startActivity(intent) }
+            },
+            onDismiss = { showAbout = false },
+        )
     }
 
     accountFor?.let { store ->

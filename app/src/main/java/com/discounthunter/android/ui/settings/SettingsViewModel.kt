@@ -13,6 +13,12 @@ import com.discounthunter.android.data.settings.SettingsRepository
 import com.discounthunter.android.data.settings.ThemeMode
 import com.discounthunter.android.di.AppContainer
 import com.discounthunter.android.diagnostics.AppLog
+import com.discounthunter.android.update.ApkDownloader
+import com.discounthunter.android.update.ApkInstaller
+import com.discounthunter.android.update.GitHubReleaseService
+import com.discounthunter.android.update.ReleaseInfo
+import com.discounthunter.android.update.UpdateController
+import com.discounthunter.android.update.UpdateState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +31,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** What happened when the user asked to install a downloaded update. */
+sealed interface InstallOutcome {
+    /** The platform installer was started with the downloaded package. */
+    data object Started : InstallOutcome
+
+    /**
+     * The app is not allowed to request package installation yet.
+     *
+     * The user has been sent to the system screen where the permission is granted. The
+     * installation is not started, because Android will not allow it until they do.
+     */
+    data object PermissionNeeded : InstallOutcome
+
+    /** There was nothing downloaded to install. */
+    data object NothingToInstall : InstallOutcome
+
+    /** The installer could not be started, and the screen says so. */
+    data class Failed(val message: String) : InstallOutcome
+}
 data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
     /** `-1` until the first measurement completes. */
@@ -62,6 +87,26 @@ class SettingsViewModel(
     private val deleting = MutableStateFlow(false)
     private val detectedApps = MutableStateFlow(StoreId.MAJOR.associateWith { false })
     private val notificationsAllowed = MutableStateFlow(true)
+
+    /**
+     * The updater.
+     *
+     * It lives here rather than in its own view model because the About dialog and the update
+     * entry are the same feature, and two view models would mean two release-metadata fetches and
+     * two answers to "is there an update".
+     */
+    private val updateController = UpdateController(
+        context = container.appContext,
+        service = GitHubReleaseService(container.network, container.payloadCacheForUpdates),
+        downloader = ApkDownloader(container.httpClient),
+        scope = viewModelScope,
+    )
+
+    private val installer = ApkInstaller(container.appContext)
+
+    /** The update state and the latest release, for the about dialog. */
+    val updateState: StateFlow<UpdateState> = updateController.state
+    val latestRelease: StateFlow<ReleaseInfo?> = updateController.release
 
     /**
      * The state this screen owns itself, as opposed to state that comes from the repository.
@@ -173,6 +218,45 @@ class SettingsViewModel(
     fun refreshNotificationPermission() {
         notificationsAllowed.value = AlertNotifier(container.appContext).canPost()
     }
+
+    // ------------------------------------------------------------------ updates
+
+    /** Checks the official release feed for a newer version. */
+    fun checkForUpdates() = updateController.check()
+
+    /** Downloads the update the user has asked for. */
+    fun downloadUpdate() = updateController.download()
+
+    /** Cancels a check or a download in flight. */
+    fun cancelUpdate() = updateController.cancel()
+
+    /**
+     * Starts the platform installer for the downloaded package.
+     *
+     * Returns the outcome so the screen can say what happened: the installer was started, the
+     * permission is missing and the user was sent to grant it, or the installer could not be
+     * started at all.
+     */
+    fun installUpdate(): InstallOutcome {
+        val state = updateController.state.value
+        val file = (state as? UpdateState.ReadyToInstall)?.file
+            ?: return InstallOutcome.NothingToInstall
+        if (!installer.canRequestInstall()) {
+            return if (installer.openInstallPermissionSettings()) {
+                InstallOutcome.PermissionNeeded
+            } else {
+                InstallOutcome.Failed("The system settings screen could not be opened.")
+            }
+        }
+        return if (installer.startInstallation(file)) {
+            InstallOutcome.Started
+        } else {
+            InstallOutcome.Failed("The package installer could not be started.")
+        }
+    }
+
+    /** Removes a downloaded installer that is no longer needed. */
+    fun discardUpdate() = updateController.discardDownload()
 
     fun linkAccount(store: StoreId, name: String?) =
         viewModelScope.launch { settingsRepository.setLinkedAccount(store, name) }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The downloaded release package, and nothing else.
+
+    A `file://` URI cannot be handed to the package installer on any modern Android — it throws
+    `FileUriExposedException` — so the downloaded APK has to be shared as a `content://` URI with a
+    temporary read grant. Only the `updates` folder is reachable, so the user's snapshots, saved
+    settings and diagnostics report cannot be exposed through the same provider.
+-->
+<paths>
+    <cache-path
+        name="updates"
+        path="updates/" />
+</paths>

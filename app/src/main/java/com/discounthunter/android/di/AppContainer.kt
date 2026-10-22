@@ -94,6 +94,15 @@ class AppContainer(
     private val payloadCache = PayloadCache(File(appContext.cacheDir, "http_cache"))
 
     /**
+     * The raw-payload cache, shared with the release-metadata service.
+     *
+     * Public because the updater caches the release feed through it, so that the About screen can
+     * still show something useful when the network is unavailable. Using the same cache as the
+     * stores means there is one place that decides how long a payload is fresh.
+     */
+    val payloadCacheForUpdates: PayloadCache get() = payloadCache
+
+    /**
      * Snapshots live in `filesDir`: they are browsable history, not a disposable cache, so they
      * must survive the system clearing `cacheDir`.
      */
