@@ -82,11 +82,15 @@ class ApkInstaller(
             // carries the system's own package-installation flow, including the "unknown sources"
             // handling. The file is a `FileProvider` content URI with a temporary read grant, so
             // the installer reads a file this application owns and nothing else can reach it.
-            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                setData(uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            //
+            // The intent is built with separate statements rather than an `apply` block on
+            // purpose: the static analysis that checks this pattern follows the URI from
+            // `FileProvider.getUriForFile` into `setData` only when the receiver is a named
+            // local, and it reported the `apply` form as an arbitrary installation.
+            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE)
+            intent.setData(uri)
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
             true
         } catch (error: Exception) {
