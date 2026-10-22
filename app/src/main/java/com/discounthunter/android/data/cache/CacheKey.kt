@@ -57,4 +57,9 @@ object CacheKeys {
 
     // ---- Epic --------------------------------------------------------------------------
     fun epicFreeGames(country: String) = CacheKey("epic", "freegames", country, "v3")
+
+    // ---- GitHub -------------------------------------------------------------------------
+    // The application's own release metadata, used by the in-app updater and the about screen.
+    fun githubLatestRelease(owner: String, repository: String) =
+        CacheKey("github", "latest-release", owner, repository, "v1")
 }

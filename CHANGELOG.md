@@ -9,6 +9,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet. Open an issue or PR to propose something.
 
+## [1.1.1] - 2026-10-22
+
+The app can now find and install its own updates, and its Settings screen has an About section that
+shows what changed in the latest release.
+
+### Added
+
+- **Check for updates.** A new *Updates* card in Settings. It reports whether a newer version has
+  been published, and downloads and starts the installation of it without the user having to find
+  the release page first. Nothing is fetched until the button is pressed, and nothing is downloaded
+  until the download is asked for.
+- **About / What's New.** A dialog showing the version installed on the device, the latest
+  published version, when it was published, and the release notes for it. The notes come from the
+  official GitHub release, so they are the same notes the release page shows. A copy is kept on the
+  device, so the dialog still says something useful when there is no network.
+- **The update flow respects the platform's safeguards.** The downloaded package is handed to
+  Android's own installer, which asks the user to confirm. On Android 8 and above the "install
+  unknown apps" permission is granted separately, in system settings, and the app says so and
+  takes the user there.
+
+### Fixed
+
+- **A release signed with the wrong key installed once and then refused to update.** The release
+  workflow now restores the keystore from a repository secret, verifies the signature before
+  publishing, and refuses to publish at all if the secret is missing.
+
+### Security
+
+- The release check uses GitHub's public API **without a token**. A token embedded in an
+  application can be extracted from every user's device; the endpoint is public, and the result is
+  cached so it is not hammered.
+- Release notes are rendered from a deliberately small Markdown subset. HTML is stripped, and a
+  link in somebody else's release notes is shown as text rather than made tappable.
+
 ## [1.1.0] - 2026-10-20
 
 Deal alerts: the app now tells you when a game you saved goes on sale, and when a game becomes
@@ -189,8 +223,7 @@ failure mode behind every one.
 - **Price history is local.** The chart shows prices *this device* recorded. External databases are
   reachable through deep links rather than being scraped, because most of them block programmatic
   access.
-
-[1.0.0]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.0.0
-
-[Unreleased]: https://github.com/JuggyBob/DiscountHunterAndroid/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/JuggyBob/DiscountHunterAndroid/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.1.1
 [1.1.0]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.1.0
+[1.0.0]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.0.0

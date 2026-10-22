@@ -18,6 +18,15 @@
     -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
+    <!--
+        Lets the updater hand a downloaded release to Android's own package installer. The
+        application cannot install anything silently: the user still sees and confirms the
+        installation, and on Android 8 and above the "install unknown apps" permission is granted
+        separately, in system settings. This permission is what allows the request to be made at
+        all; it is not what allows a silent install.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".DiscountHunterApplication"
         android:allowBackup="true"
@@ -111,6 +120,18 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            Receives the result of an installation started by the updater, so the app can tell
+            the user whether the update actually went through rather than leaving them to guess.
+        -->
+        <receiver
+            android:name=".update.InstallStatusReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.discounthunter.android.action.INSTALL_STATUS" />
             </intent-filter>
         </receiver>
     </application>

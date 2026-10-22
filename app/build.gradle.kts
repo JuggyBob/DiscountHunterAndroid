@@ -37,8 +37,8 @@ android {
         targetSdk = 36
         // Must be higher than any build already installed on a user's device, or the install is
         // refused as a downgrade. The device this was built against had 1.0.1-release at code 7.
-        versionCode = 8
-        versionName = "1.1.0-release"
+        versionCode = 9
+        versionName = "1.1.1-release"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

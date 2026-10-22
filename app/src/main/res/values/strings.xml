@@ -138,4 +138,35 @@
     <string name="alert_sale_body_no_original">Now %1$s on %2$s</string>
     <string name="alert_free_title">%1$s is free</string>
     <string name="alert_free_body">Free to keep on %1$s. Claim it before it is gone.</string>
+    <!-- The updater and the about dialog. -->
+    <string name="settings_updates">Updates</string>
+    <string name="settings_updates_summary">Check the official releases for a newer version.</string>
+    <string name="settings_about_summary">Version, release notes and where to get the app.</string>
+    <string name="about_title">About Discount Hunter</string>
+    <string name="about_name">Discount Hunter</string>
+    <string name="about_installed">Installed</string>
+    <string name="about_latest">Latest release</string>
+    <string name="about_published">Published</string>
+    <string name="about_whats_new">What\'s new in %1$s</string>
+    <string name="about_view_on_github">View on GitHub</string>
+    <string name="about_close">Close</string>
+    <string name="about_no_notes">This release has no notes.</string>
+    <string name="update_idle">The app does not check for updates on its own. Nothing is downloaded until you ask for it.</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_recheck">Check again</string>
+    <string name="update_retry">Try again</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_up_to_date">You have the latest version.</string>
+    <string name="update_available">Version %1$s is installed. Version %2$s is available.</string>
+    <string name="update_download">Download</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_cancel">Cancel</string>
+    <string name="update_install">Install</string>
+    <string name="update_ready">Downloaded. Android will ask you to confirm the installation.</string>
+    <string name="update_no_package">Open the release page below to see what was published.</string>
+    <string name="update_permission_needed">Android needs permission to install this app. Allow "Install unknown apps" for Discount Hunter, then try again.</string>
+    <string name="update_install_failed">The installer could not be started.</string>
+    <string name="update_install_awaiting">Confirm the installation in the next screen.</string>
+    <string name="update_install_done">The update was installed.</string>
+    <string name="update_install_error">The installation failed.</string>
 </resources>
