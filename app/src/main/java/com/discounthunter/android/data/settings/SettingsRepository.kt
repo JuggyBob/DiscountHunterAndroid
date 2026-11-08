@@ -67,6 +67,15 @@ class SettingsRepository(context: Context) {
     /** Turns the background sale and free-game announcements on or off. */
     suspend fun setSaleAlertsEnabled(enabled: Boolean) = edit { it[KEY_SALE_ALERTS] = enabled }
 
+    /**
+     * Remembers that the notification-permission explanation has been shown.
+     *
+     * Stored even when the user declines, so the app asks once and then respects the answer. The
+     * Settings screen always offers a way back, so this is not a dead end.
+     */
+    suspend fun setNotificationPermissionPromptShown(shown: Boolean = true) =
+        edit { it[KEY_NOTIFICATION_PROMPT] = shown }
+
     suspend fun rememberSearch(query: String) = edit { preferences ->
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return@edit
@@ -109,6 +118,7 @@ class SettingsRepository(context: Context) {
             autoplayTrailers = this[KEY_AUTOPLAY] ?: false,
             preferStoreApps = this[KEY_STORE_APPS] ?: true,
             saleAlertsEnabled = this[KEY_SALE_ALERTS] ?: true,
+            hasPromptedNotificationPermission = this[KEY_NOTIFICATION_PROMPT] ?: false,
             recentSearches = decodeSearches(this[KEY_SEARCHES]),
             linkedAccounts = decodeAccounts(this[KEY_ACCOUNTS]),
             wishlist = decodeWishlist(this[KEY_WISHLIST]),
@@ -224,7 +234,8 @@ class SettingsRepository(context: Context) {
         val KEY_DEAL_LIMIT = intPreferencesKey("deal_limit")
         val KEY_AUTOPLAY = booleanPreferencesKey("autoplay_trailers")
         val KEY_STORE_APPS = booleanPreferencesKey("prefer_store_apps")
-    val KEY_SALE_ALERTS = booleanPreferencesKey("sale_alerts_enabled")
+        val KEY_SALE_ALERTS = booleanPreferencesKey("sale_alerts_enabled")
+        val KEY_NOTIFICATION_PROMPT = booleanPreferencesKey("notification_permission_prompted")
         val KEY_SEARCHES = stringPreferencesKey("recent_searches")
         val KEY_ACCOUNTS = stringPreferencesKey("linked_accounts")
         val KEY_WISHLIST = stringPreferencesKey("wishlist")

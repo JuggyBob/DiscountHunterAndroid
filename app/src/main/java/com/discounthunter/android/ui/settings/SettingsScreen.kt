@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.discounthunter.android.BuildConfig
 import androidx.compose.material.icons.outlined.BugReport
@@ -55,11 +59,18 @@ import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ButtonDefaults
 import com.discounthunter.android.R
+import com.discounthunter.android.alerts.AlertCheckOutcome
+import com.discounthunter.android.alerts.AlertRunStatus
+import com.discounthunter.android.alerts.NotificationPermissionPolicy
 import com.discounthunter.android.core.model.StoreId
 import com.discounthunter.android.data.settings.AppSettings
 import com.discounthunter.android.data.settings.CurrencyCode
 import com.discounthunter.android.data.settings.ThemeMode
 import com.discounthunter.android.update.UpdateState
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
 /**
@@ -105,6 +116,21 @@ fun SettingsScreen(
     LaunchedEffect(Unit) {
         viewModel.refreshStoreApps()
         onStoreAppStateChanged()
+    }
+
+    // A permission or battery setting can be changed in system settings while this screen is in
+    // the background. Re-read the things that depend on them when the user comes back, rather than
+    // showing a stale warning or a stale "last checked" line.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshNotificationPermission()
+                viewModel.refreshAlertDiagnostics()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -247,9 +273,13 @@ fun SettingsScreen(
 
                 // The switch can be on and the feature still be unable to do anything, because
                 // Android 13 and above need notifications to be granted explicitly. Saying so, and
-                // offering the one place it can be changed, is the difference between a setting
-                // that works and a setting that quietly does nothing.
-                if (state.settings.saleAlertsEnabled && !state.notificationsAllowed) {
+                // offering both ways to fix it, is the difference between a setting that works and
+                // a setting that quietly does nothing.
+                if (NotificationPermissionPolicy.shouldWarn(
+                        alertsEnabled = state.settings.saleAlertsEnabled,
+                        canPost = state.notificationsAllowed,
+                    )
+                ) {
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = stringResource(R.string.settings_alerts_permission_needed),
@@ -257,8 +287,55 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.error,
                     )
                     Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = viewModel::openNotificationSettings) {
-                        Text(stringResource(R.string.settings_alerts_open_settings))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // On Android 13 and above the system dialog can still be shown. If the
+                        // user has permanently denied it, Android answers immediately and the
+                        // settings button is the way back.
+                        if (NotificationPermissionPolicy.canRequestFromApp(
+                                apiLevel = Build.VERSION.SDK_INT,
+                                canPost = state.notificationsAllowed,
+                            )
+                        ) {
+                            OutlinedButton(onClick = requestNotifications) {
+                                Text(stringResource(R.string.settings_alerts_allow))
+                            }
+                        }
+                        OutlinedButton(onClick = viewModel::openNotificationSettings) {
+                            Text(stringResource(R.string.settings_alerts_open_settings))
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                AlertLastCheckText(state.alertStatus)
+                state.nextCheckAt?.let { next ->
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.settings_alerts_next_check,
+                            formatAlertTime(next),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = viewModel::checkAlertsNow) {
+                    Text(stringResource(R.string.settings_alerts_check_now))
+                }
+
+                // A device-level restriction, not an app bug: several manufacturers defer even
+                // exact alarms and periodic work until the app is next opened. The user can only
+                // fix it if they know it exists.
+                if (state.settings.saleAlertsEnabled && !state.batteryUnrestricted) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = stringResource(R.string.settings_alerts_battery_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = viewModel::openBatterySettings) {
+                        Text(stringResource(R.string.settings_alerts_battery_settings))
                     }
                 }
             }
@@ -527,6 +604,58 @@ fun SettingsScreen(
         )
     }
 }
+
+/**
+ * The result of the last background check, in one line.
+ *
+ * "No check has run yet" is a distinct message on purpose: it is the honest answer on a fresh
+ * install, and it is different from "the last check found nothing".
+ */
+@Composable
+private fun AlertLastCheckText(status: AlertRunStatus?) {
+    val text = if (status == null) {
+        stringResource(R.string.settings_alerts_never_checked)
+    } else {
+        val outcome = when (status.outcome) {
+            AlertCheckOutcome.CHECKED -> stringResource(
+                R.string.settings_alerts_outcome_checked,
+                status.deals,
+                status.wishlist,
+            )
+
+            AlertCheckOutcome.ANNOUNCED -> stringResource(
+                R.string.settings_alerts_outcome_announced,
+                status.announced,
+            )
+
+            AlertCheckOutcome.NOTIFICATIONS_BLOCKED ->
+                stringResource(R.string.settings_alerts_outcome_blocked)
+
+            AlertCheckOutcome.FEED_EMPTY ->
+                stringResource(R.string.settings_alerts_outcome_feed_empty)
+
+            AlertCheckOutcome.MONITORING_OFF ->
+                stringResource(R.string.settings_alerts_outcome_off)
+
+            AlertCheckOutcome.FAILED ->
+                stringResource(R.string.settings_alerts_outcome_failed)
+        }
+        stringResource(R.string.settings_alerts_last_check, formatAlertTime(status.checkedAt), outcome)
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** Formats an epoch-millis timestamp in the device's locale and time zone. */
+private fun formatAlertTime(epochMillis: Long): String = runCatching {
+    DateTimeFormatter
+        .ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(epochMillis))
+}.getOrDefault(epochMillis.toString())
 
 @Composable
 private fun SettingsCard(

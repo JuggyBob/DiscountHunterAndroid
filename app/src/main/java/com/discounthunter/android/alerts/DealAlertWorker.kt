@@ -49,21 +49,46 @@ class DealAlertWorker(
             return Result.retry()
         }
 
+        val statusStore = AlertStatusStore(container.alertStatusFile)
         try {
             val settings = container.settings.settings.first()
             if (!settings.saleAlertsEnabled) {
                 AppLog.i("Alerts: monitoring is off, skipping this check")
+                statusStore.record(
+                    AlertRunStatus(
+                        checkedAt = System.currentTimeMillis(),
+                        outcome = AlertCheckOutcome.MONITORING_OFF,
+                    ),
+                )
+                return Result.success()
+            }
+
+            // Check the permission *before* fetching the feed. There is no point spending a
+            // network round trip on a notification that cannot be posted, and — more importantly —
+            // the watch state must not be advanced for something the user was never told about.
+            // Leaving it alone means the change is still there to announce once the permission is
+            // granted, rather than having been silently consumed.
+            val notifier = AlertNotifier(applicationContext, container.fxRates)
+            if (!notifier.canPost()) {
+                AppLog.w("Alerts: notifications are not allowed, so the check was skipped")
+                statusStore.record(
+                    AlertRunStatus(
+                        checkedAt = System.currentTimeMillis(),
+                        outcome = AlertCheckOutcome.NOTIFICATIONS_BLOCKED,
+                    ),
+                )
                 return Result.success()
             }
 
             // The wishlist lives in memory and is mirrored from DataStore. A worker may be the very
             // first thing to run in a fresh process, so it has to be loaded rather than assumed.
+            //
+            // An empty wishlist does **not** end the check: free games are announced whether or
+            // not anything is saved (see [SaleDetector]), so the feed is still fetched and the
+            // free-game half of the detector still runs. Returning here would silently disable
+            // free-game alerts for every user who has not saved anything yet.
             container.wishlist.loadOnce()
             val wishlist = container.wishlist.entries.value
-            if (wishlist.isEmpty()) {
-                AppLog.i("Alerts: the wishlist is empty, nothing to watch for")
-                return Result.success()
-            }
 
             val feed = container.deals.refreshFeed(
                 country = settings.steamCountry,
@@ -76,6 +101,13 @@ class DealAlertWorker(
                 AppLog.w("Alerts: the feed came back empty, so nothing could be checked")
                 // Not a failure: the stores may simply be down. Retrying immediately would hammer
                 // them, so this is a success with no work done.
+                statusStore.record(
+                    AlertRunStatus(
+                        checkedAt = System.currentTimeMillis(),
+                        outcome = AlertCheckOutcome.FEED_EMPTY,
+                        wishlist = wishlist.size,
+                    ),
+                )
                 return Result.success()
             }
 
@@ -88,26 +120,53 @@ class DealAlertWorker(
                 matches = { entry, deal -> representsSame(entry, deal.wishlistKey, deal.titleKey) },
             )
 
-            val notifier = AlertNotifier(applicationContext, container.fxRates)
             val posted = notifier.announce(
                 detection = detection,
                 currencySymbol = settings.currencySymbol,
                 currencyCode = settings.currency.code,
             )
 
-            // The state is written whether or not anything was announced. Skipping the write when
-            // there is nothing to say would lose the record of what has been seen, and the next
-            // check would announce everything again.
-            store.save(detection.nextState)
+            // The state is written when there is nothing to announce, and when what was announced
+            // actually reached the user. If there was something to say and nothing could be
+            // posted — the permission can be revoked between the check above and this line — the
+            // old record is kept, so the next check tries again instead of treating a notification
+            // the user never saw as delivered.
+            val advance = AlertDeliveryPolicy.shouldAdvanceState(
+                hasAnythingToAnnounce = detection.hasAnythingToAnnounce,
+                posted = posted,
+                previouslyInitialised = previous.initialised,
+            )
+            if (advance) {
+                store.save(detection.nextState)
+            } else {
+                AppLog.w("Alerts: nothing could be posted, so the record was left for the next check")
+            }
+
             AppLog.i(
                 "Alerts: checked ${feed.deals.size} deals, announced $posted, " +
                     "watching ${wishlist.size} saved game(s)",
+            )
+            statusStore.record(
+                AlertRunStatus(
+                    checkedAt = System.currentTimeMillis(),
+                    outcome = if (posted > 0) AlertCheckOutcome.ANNOUNCED else AlertCheckOutcome.CHECKED,
+                    announced = posted,
+                    deals = feed.deals.size,
+                    wishlist = wishlist.size,
+                ),
             )
             return Result.success()
         } catch (cancellation: kotlinx.coroutines.CancellationException) {
             throw cancellation
         } catch (error: Exception) {
             AppLog.e("Alerts: the check failed", error)
+            statusStore.record(
+                AlertRunStatus(
+                    checkedAt = System.currentTimeMillis(),
+                    outcome = AlertCheckOutcome.FAILED,
+                    message = error.message.orEmpty(),
+                ),
+            )
             // Retry, but not in a tight loop: WorkManager backs off on its own.
             return Result.retry()
         }

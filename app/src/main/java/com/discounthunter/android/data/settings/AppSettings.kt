@@ -36,6 +36,14 @@ data class AppSettings(
      * nobody ever turns on.
      */
     val saleAlertsEnabled: Boolean = true,
+    /**
+     * Whether the one-time notification-permission explanation has been shown.
+     *
+     * On Android 13 and above the permission has to be granted at runtime, and a fresh install has
+     * it denied. The deal-alerts feature is on by default, so the app has to ask — but only
+     * once, and never again after a "not now". The Settings screen keeps a manual way back in.
+     */
+    val hasPromptedNotificationPermission: Boolean = false,
     val recentSearches: List<String> = emptyList(),
     val linkedAccounts: Map<StoreId, String> = emptyMap(),
     val wishlist: List<WishlistEntryRecord> = emptyList(),

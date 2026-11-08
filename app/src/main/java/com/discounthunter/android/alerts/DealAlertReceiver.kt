@@ -22,8 +22,9 @@ class DealAlertReceiver : BroadcastReceiver() {
         if (intent.action != DealAlertScheduler.ACTION_CHECK) return
         AppLog.i("Alerts: the alarm fired")
         // Re-arm first. If the process is killed between here and the work being queued, the next
-        // alarm is already in place.
-        DealAlertScheduler.scheduleAlarm(context)
+        // alarm is already in place. `force` because this firing is what consumes the old alarm:
+        // the chain must continue with a fresh 60 minutes.
+        DealAlertScheduler.scheduleAlarm(context, force = true)
         DealAlertScheduler.enqueueNow(context)
     }
 }

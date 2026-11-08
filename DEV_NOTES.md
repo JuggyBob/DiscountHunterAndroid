@@ -788,6 +788,75 @@ The fix is two keep rules in `proguard-rules.pro`:
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
 -keep class androidx.work.impl.** { *; }
 ```
+### 4.44 The notification permission was never requested, because the feature was already on
+
+The most direct reason a fresh install could not show a notification, on any Android 13 or later
+device.
+
+`saleAlertsEnabled` defaults to `true`. The only call to `requestPermissions(POST_NOTIFICATIONS)`
+was in the Settings switch's `onCheckedChange`, guarded by `if (enabled)`. A new user therefore saw
+the switch already on, never toggled it, and was never asked. The system denied the permission by
+default, the background check ran, the watch state advanced, and every notification was dropped.
+The feature looked enabled and did nothing.
+
+The fix is a one-time explanation after the intro, followed by the system request. The answer is
+remembered in `AppSettings.hasPromptedNotificationPermission`, so "Not now" is respected; Settings
+keeps an explicit "Allow notifications" action, because Android will not show the dialog again after
+a permanent denial.
+
+### 4.45 Every app launch pushed the alarm an hour into the future
+
+The scheduler used two mechanisms on purpose: a punctual `AlarmManager` alarm and a deferrable
+WorkManager periodic worker. The alarm is a chain - `DealAlertReceiver` re-arms the next one when it
+fires - but `AppContainer.start()` also called `scheduleAlarm()` on **every process creation**. Each
+call used `setExactAndAllowWhileIdle(now + 60 min)` with `FLAG_UPDATE_CURRENT`, which replaces the
+pending alarm rather than leaving it alone.
+
+WorkManager starts the process for its own periodic worker. So the backstop was resetting the
+punctual path every time it ran. A user who opened the app more often than hourly - or a device
+whose periodic work ran often - could keep the alarm permanently an hour away. Only the deferrable
+worker was left, and on a battery-managed phone that is exactly the "no notification when the app is
+closed" report.
+
+The fix persists the due time, asks `PendingIntent.getBroadcast(..., FLAG_NO_CREATE)` whether the
+alarm still exists, and leaves an armed alarm alone. `AlarmSchedule.shouldArm` is pure and tested:
+force (a firing, a reboot, an app update), no pending alarm, or more than two intervals overdue. A
+normally pending alarm is never moved. The alarm time in `dumpsys alarm` is byte-for-byte unchanged
+across a process kill and relaunch.
+
+### 4.46 A notification that could not be posted was recorded as delivered
+
+The worker saved `detection.nextState` unconditionally. If `AlertNotifier.canPost()` was false - the
+permission had not been granted, or the user had blocked the channel - `announce()` returned zero
+and the state still recorded the sale as announced. Granting the permission later brought nothing
+back, because the app believed it had already told the user.
+
+The worker now checks `canPost()` **before** fetching the feed and returns without touching the
+record. `AlertDeliveryPolicy.shouldAdvanceState` also covers the permission being revoked between
+the check and the post: the record advances only when there was nothing to announce, something was
+actually posted, or this was the first run establishing its baseline. The first-run case is
+deliberate - without it every run would look like a first run and announce nothing.
+
+### 4.47 An empty wishlist disabled free-game alerts
+
+`SaleDetector` announces free games whether or not they are saved. The worker, however, returned
+early when the wishlist was empty, with the log line "nothing to watch for". A user with no saved
+games therefore never received a free-game notification, which is the one alert the feature promises
+without any setup.
+
+The early return is gone. The detector already handles an empty wishlist; the feed is still fetched
+and the free-game half still runs. The status record shows `wishlist: 0` rather than hiding the
+check.
+
+### 4.48 "Delete all app data" left the alert records behind
+
+`deleteAllData()` cleared the payload cache, the snapshots and the settings, but not
+`files/alerts/watch-state.json` or the new status file. The next check could therefore believe it
+had already announced sales from before the wipe, and the Settings status described a check that
+belonged to deleted data. It now deletes both, resets the in-memory status, and restarts the default
+schedule - because the settings return to `saleAlertsEnabled = true`, and a schedule that had been
+stopped would otherwise stay stopped while the switch showed on.
+
 ---
 
 ## 5. Design decisions worth explaining

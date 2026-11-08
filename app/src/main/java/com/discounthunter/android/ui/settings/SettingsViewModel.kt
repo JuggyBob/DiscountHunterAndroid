@@ -2,10 +2,14 @@ package com.discounthunter.android.ui.settings
 
 import android.content.Context
 import android.content.Intent
+import android.os.PowerManager
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.discounthunter.android.alerts.AlertNotifier
+import com.discounthunter.android.alerts.AlertRunStatus
+import com.discounthunter.android.alerts.AlertStatusStore
+import com.discounthunter.android.alerts.DealAlertScheduler
 import com.discounthunter.android.core.model.StoreId
 import com.discounthunter.android.data.settings.AppSettings
 import com.discounthunter.android.data.settings.CurrencyCode
@@ -68,6 +72,18 @@ data class SettingsUiState(
      * while this is false, which is exactly the state that makes the feature look broken.
      */
     val notificationsAllowed: Boolean = true,
+    /** The result of the last background deal check, or null when none has run. */
+    val alertStatus: AlertRunStatus? = null,
+    /** When the next punctual check is due, or null when no alarm is armed. */
+    val nextCheckAt: Long? = null,
+    /**
+     * True when Android is not restricting the app's background work.
+     *
+     * On several manufacturers' builds the periodic worker and even the alarm are deferred until
+     * the app is opened when battery optimisation is on. This is a property of the device, not of
+     * the app, but the user can only fix it if they are told.
+     */
+    val batteryUnrestricted: Boolean = true,
 )
 
 /**
@@ -88,6 +104,9 @@ class SettingsViewModel(
     private val deleting = MutableStateFlow(false)
     private val detectedApps = MutableStateFlow(StoreId.MAJOR.associateWith { false })
     private val notificationsAllowed = MutableStateFlow(true)
+    private val alertStatus = MutableStateFlow<AlertRunStatus?>(null)
+    private val nextCheckAt = MutableStateFlow<Long?>(null)
+    private val batteryUnrestricted = MutableStateFlow(true)
 
     /**
      * The updater.
@@ -121,6 +140,7 @@ class SettingsViewModel(
         val clearing: Boolean,
         val deleting: Boolean,
         val notificationsAllowed: Boolean,
+        val alertStatus: AlertRunStatus?,
     )
 
     private val localFlags = combine(
@@ -128,15 +148,18 @@ class SettingsViewModel(
         clearing,
         deleting,
         notificationsAllowed,
-    ) { size, isClearing, isDeleting, allowed ->
-        LocalFlags(size, isClearing, isDeleting, allowed)
+        alertStatus,
+    ) { size, isClearing, isDeleting, allowed, status ->
+        LocalFlags(size, isClearing, isDeleting, allowed, status)
     }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         settingsRepository.settings,
         detectedApps,
         localFlags,
-    ) { settings, apps, flags ->
+        batteryUnrestricted,
+        nextCheckAt,
+    ) { settings, apps, flags, battery, nextCheck ->
         SettingsUiState(
             settings = settings,
             cacheSizeBytes = flags.cacheSize,
@@ -144,6 +167,9 @@ class SettingsViewModel(
             isDeletingData = flags.deleting,
             storeApps = apps,
             notificationsAllowed = flags.notificationsAllowed,
+            alertStatus = flags.alertStatus,
+            nextCheckAt = nextCheck,
+            batteryUnrestricted = battery,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -157,6 +183,12 @@ class SettingsViewModel(
             .launchIn(viewModelScope)
         refreshStoreApps()
         refreshNotificationPermission()
+        refreshAlertDiagnostics()
+        // The worker can finish while this screen is open. The process-wide flow means the status
+        // line updates then, without the user having to leave and come back.
+        viewModelScope.launch {
+            AlertStatusStore.latest.collect { status -> alertStatus.value = status }
+        }
     }
 
     // ------------------------------------------------------------------ actions
@@ -195,6 +227,7 @@ class SettingsViewModel(
     fun setSaleAlertsEnabled(enabled: Boolean) = viewModelScope.launch {
         container.setSaleAlertsEnabled(enabled)
         refreshNotificationPermission()
+        refreshAlertDiagnostics()
     }
 
     /**
@@ -219,6 +252,55 @@ class SettingsViewModel(
     /** Re-reads whether notifications are allowed, so the screen stops warning once they are. */
     fun refreshNotificationPermission() {
         notificationsAllowed.value = AlertNotifier(container.appContext).canPost()
+    }
+
+    /**
+     * Re-reads the last background check, the next alarm and the device's battery policy.
+     *
+     * Called when the screen appears, on resume (the user may have changed a system setting while
+     * they were away), and after the switch is toggled. These are deliberately not a single
+     * persisted setting: two come from the scheduler and the platform, and one from a file the
+     * worker wrote.
+     */
+    fun refreshAlertDiagnostics() {
+        nextCheckAt.value = DealAlertScheduler.nextAlarmAt(container.appContext)
+        val power = container.appContext.getSystemService(PowerManager::class.java)
+        batteryUnrestricted.value =
+            power?.isIgnoringBatteryOptimizations(container.appContext.packageName) ?: true
+        viewModelScope.launch {
+            alertStatus.value = AlertStatusStore(container.alertStatusFile).load() ?: alertStatus.value
+        }
+    }
+
+    /**
+     * Queues a deal check immediately.
+     *
+     * The result appears in the status line once the worker has run, which is usually a few
+     * seconds. This exists so a user who is wondering whether the feature works does not have to
+     * wait an hour, or guess from the absence of a notification.
+     */
+    fun checkAlertsNow() {
+        DealAlertScheduler.enqueueNow(container.appContext)
+        AppLog.i("Alerts: a check was requested from Settings")
+    }
+
+    /**
+     * Opens the screen where the user can exempt the app from battery optimisation.
+     *
+     * The app cannot grant this itself, and it should not: the permission that would allow a
+     * one-tap request is reserved for a narrow set of app types. Opening the list is honest and
+     * leaves the decision with the user. If a manufacturer has hidden that screen, the app's own
+     * details page is the fallback, because it has a battery entry on most builds.
+     */
+    fun openBatterySettings() {
+        val context = container.appContext
+        val optimization = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { context.startActivity(optimization) }.isSuccess) return
+        val details = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(android.net.Uri.fromParts("package", context.packageName, null))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(details) }
     }
 
     // ------------------------------------------------------------------ updates
