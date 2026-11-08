@@ -77,6 +77,7 @@ import com.discounthunter.android.ui.search.SearchScreen
 import com.discounthunter.android.ui.search.SearchViewModel
 import com.discounthunter.android.ui.settings.SettingsScreen
 import com.discounthunter.android.ui.settings.SettingsViewModel
+import com.discounthunter.android.ui.settings.NotificationPermissionPrompt
 import com.discounthunter.android.ui.theme.DiscountHunterTheme
 import com.discounthunter.android.ui.theme.Motion
 import com.discounthunter.android.ui.wishlist.WishlistScreen
@@ -481,6 +482,10 @@ private fun MainShell(
             }
         }
     }
+
+    // Asked once, after the tour, when the main app is actually on screen. On Android 13 and above
+    // the deal-alerts feature cannot post anything without it, and the feature is on by default.
+    NotificationPermissionPrompt(container)
 }
 
 /** Reconstructs the reference from the route arguments. */

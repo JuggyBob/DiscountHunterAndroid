@@ -2,6 +2,7 @@ package com.discounthunter.android.di
 
 import android.content.Context
 import com.discounthunter.android.alerts.AlertNotifier
+import com.discounthunter.android.alerts.AlertStatusStore
 import com.discounthunter.android.alerts.DealAlertScheduler
 import com.discounthunter.android.alerts.WatchStateStore
 import com.discounthunter.android.core.model.FxRates
@@ -136,6 +137,15 @@ class AppContainer(
      */
     val watchStateFile: File = File(appContext.filesDir, "alerts/watch-state.json")
 
+    /**
+     * Where the result of the last background check is recorded, for the Settings screen.
+     *
+     * Separate from the watch state: that file decides what is announced, this one explains what
+     * happened. Mixing them would mean a diagnostic write could never be allowed to fail without
+     * affecting the announcement decision.
+     */
+    val alertStatusFile: File = File(appContext.filesDir, "alerts/status.json")
+
     /** The store behind the background announcements. */
     val watchStateStore = WatchStateStore(watchStateFile)
 
@@ -169,7 +179,19 @@ class AppContainer(
     suspend fun deleteAllData() {
         payloadCache.clear()
         snapshotStore.clear()
+        // The alert records are application data too. Leaving the watch state behind would make
+        // the first check after a wipe think it had already announced sales from before it; the
+        // status record would describe a check that belongs to the deleted data.
+        runCatching { watchStateFile.delete() }
+        runCatching { alertStatusFile.delete() }
+        AlertStatusStore.reset()
         settings.reset()
+
+        // Settings now hold their defaults, and the default for deal alerts is on. If the user had
+        // turned them off, the schedule was stopped and would otherwise stay stopped while the
+        // switch showed on.
+        AlertNotifier(appContext, fxRates).ensureChannels()
+        DealAlertScheduler.start(appContext)
     }
 
     fun start() {
@@ -202,6 +224,9 @@ class AppContainer(
         if (enabled) {
             AlertNotifier(appContext, fxRates).ensureChannels()
             DealAlertScheduler.start(appContext)
+            // Establish the baseline now rather than an hour from now. It also makes the switch
+            // give immediate, visible feedback in Settings, which is where the user turns it on.
+            DealAlertScheduler.enqueueNow(appContext)
         } else {
             DealAlertScheduler.stop(appContext)
         }

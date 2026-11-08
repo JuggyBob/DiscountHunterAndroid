@@ -9,6 +9,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet. Open an issue or PR to propose something.
 
+## [1.1.2] - 2026-11-08
+
+Notifications now work on a device that has not opened the app for a while, and on a fresh install.
+
+### Fixed
+
+- **A fresh install could never show a notification.** Deal alerts are on by default, but on
+  Android 13 and above the notification permission starts denied, and the app only asked when the
+  switch was turned from off to on — which it never was. The app now explains why it needs the
+  permission and asks for it once, after the intro. "Not now" is remembered, and Settings keeps an
+  **Allow notifications** action.
+- **Opening the app pushed the next background check back.** Every process start re-armed the
+  hourly alarm to a fresh hour, including the process starts WorkManager performs for its own
+  worker. On a device that was woken often enough, the punctual alarm never fired. An alarm that is
+  already armed is now left alone; only a firing, a reboot, an app update, or turning the feature
+  on or off changes it.
+- **The check recorded changes it could not post.** If notifications were blocked when a sale was
+  detected, the app marked it as announced anyway, so granting the permission later brought
+  nothing back. The record is now left untouched until something is actually posted.
+- **Free games were skipped when the wishlist was empty.** The worker returned early, even though
+  free games are announced without being saved. It now checks them regardless.
+- **"Delete all app data" left the alert records behind.** It now clears the watch state and the
+  status record too, and restores the default schedule.
+
+### Added
+
+- **Deal-alert diagnostics in Settings.** The last-check line says when the last check ran and what
+  it did — checked, posted, blocked, no deals, or failed — and the next-check line says when the
+  next alarm is due. A **Check now** button runs one immediately.
+- **A background-reliability hint.** If Android's battery optimisation is restricting the app, the
+  card says so and links to the battery settings, because several manufacturers defer background
+  work until the app is next opened.
+
 ## [1.1.1] - 2026-10-22
 
 The app can now find and install its own updates, and its Settings screen has an About section that
@@ -223,7 +256,8 @@ failure mode behind every one.
 - **Price history is local.** The chart shows prices *this device* recorded. External databases are
   reachable through deep links rather than being scraped, because most of them block programmatic
   access.
-[Unreleased]: https://github.com/JuggyBob/DiscountHunterAndroid/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/JuggyBob/DiscountHunterAndroid/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.1.2
 [1.1.1]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.1.1
 [1.1.0]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.1.0
 [1.0.0]: https://github.com/JuggyBob/DiscountHunterAndroid/releases/tag/v1.0.0

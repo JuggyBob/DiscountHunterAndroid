@@ -36,16 +36,17 @@ games to watch their prices.
   <img src="docs/screenshots/08-diagnostics.png" width="32%" alt="Settings, including log export" />
 </p>
 
-## What is new in 1.1.1
+## What is new in 1.1.2
 
-**The app can now update itself.** Settings has a *Check for updates* entry that finds a newer
-release, downloads it, and starts Android's own installer for it — and an *About* dialog that shows
-the version you are on, the version published most recently, and the release notes for it, fetched
-from the official GitHub release.
+**Deal alerts now work when the app has been closed, and on a fresh install.** There were four
+separate reasons they could fail silently: a device on Android 13+ was never asked for the
+notification permission, opening the app kept pushing the hourly check back, a sale detected while
+notifications were blocked was recorded as delivered, and free games were skipped when nothing was
+saved.
 
-Nothing is fetched until you ask, nothing is downloaded until you ask for that, and the
-installation itself is still confirmed by Android, in the normal way. See
-[CHANGELOG.md](CHANGELOG.md) for the full list.
+Settings now also shows when the last check ran, what it did, and when the next one is due, with a
+**Check now** button — and points out Android's battery optimisation when it is restricting
+background work. See [CHANGELOG.md](CHANGELOG.md) for the details.
 
 ## Download
 
