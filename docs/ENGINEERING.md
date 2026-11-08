@@ -398,6 +398,24 @@ Run a single suite:
     a call R8 cannot see, so R8 removed it. Every debug run passed; the crash existed only in the
     build that would have been shipped. Fixed with two keep rules, and the release APK is now
     installed and launched on a device before the work is called done.
+49. **A fresh install could never show a notification.** Deal alerts default to on, but the only
+    `POST_NOTIFICATIONS` request was in the switch's off-to-on handler, which a fresh install never
+    reaches. On Android 13+ the permission starts denied, so the check ran, the record advanced and
+    every notification was dropped. A one-time explanation after the intro now asks, and Settings
+    keeps an Allow notifications action.
+50. **Every process start pushed the alarm an hour into the future.** `AppContainer.start()` called
+    `scheduleAlarm()` with `FLAG_UPDATE_CURRENT`, including the process WorkManager creates for its
+    own worker. On a device woken often enough the punctual alarm never fired. The due time is now
+    persisted, an armed alarm is left alone, and only a firing, reboot, app replacement or explicit
+    on/off change re-arms it (`AlarmSchedule.shouldArm`).
+51. **A change detected while notifications were blocked was recorded as delivered.** The watch
+    state advanced even when `announce()` posted nothing, so granting the permission later brought
+    nothing back. `AlertDeliveryPolicy.shouldAdvanceState` now requires an actual post, except on
+    the first-run baseline, and the worker checks `canPost()` before fetching.
+52. **Free games were skipped when the wishlist was empty.** `SaleDetector` announces them without a
+    wishlist, but the worker returned early. The early return is gone.
+53. **"Delete all app data" left the alert records behind.** It now clears the watch state and the
+    status record, resets the in-memory status, and restarts the default schedule.
 Full write-up with the reasoning in [DEV_NOTES.md](DEV_NOTES.md).
 
 

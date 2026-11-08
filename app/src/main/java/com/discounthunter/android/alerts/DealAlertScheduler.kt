@@ -95,7 +95,10 @@ object DealAlertScheduler {
     /** Stops monitoring and cancels anything already queued. */
     fun stop(context: Context) {
         runCatching { WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK) }
-        runCatching { WorkManager.getInstance(context).cancelUniqueWork(ONE_TIME_WORK) }
+        // The one-time checks are enqueued under a tag rather than a unique name (see
+        // [enqueueNow]), so cancelling them has to be by tag. `cancelUniqueWork` would silently
+        // cancel nothing here.
+        runCatching { WorkManager.getInstance(context).cancelAllWorkByTag(ONE_TIME_WORK) }
         cancelAlarm(context)
         AppLog.i("Alerts: monitoring stopped")
     }
